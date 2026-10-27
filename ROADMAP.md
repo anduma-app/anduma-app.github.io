@@ -48,6 +48,10 @@ riceve una push di alert.
 - Ricerca fermate ordinata per vicinanza (permesso posizione).
 - Mini-mappa / tap-per-mappa sul risultato di ricerca.
 - Reminder sciopero il giorno prima e il mattino stesso; avviso sciopero anche a chi ha solo preferiti.
+- Errori sistematici delle stime GTT per linea (es. linea 4): registrare le previsioni e confrontarle
+  con i passaggi effettivi (posizioni dei mezzi o scomparsa della fermata dal trip update), misurare
+  lo scarto per linea, fascia oraria e distanza dalla fermata, e valutare una correzione applicata
+  agli ETA (solo dove lo scarto è stabile e misurato, con il dato grezzo sempre disponibile).
 - Statistiche di puntualità, stima congestione da `shapes.txt`, pianificazione viaggio (OpenTripPlanner).
 
 ## Rischi
