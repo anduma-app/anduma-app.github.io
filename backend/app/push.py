@@ -24,6 +24,9 @@ from .db import Device
 
 log = logging.getLogger(__name__)
 
+# Canale di notifica Android creato dall'app (mobile/.../MainActivity.kt).
+ANDROID_CHANNEL_ID = "transito_alerts"
+
 
 class InvalidTokenError(Exception):
     """Il token FCM non è più valido (device disinstallato / token ruotato)."""
@@ -71,6 +74,12 @@ class FirebaseSender:
             token=token,
             notification=messaging.Notification(title=message.title, body=message.body),
             data={k: str(v) for k, v in message.data.items()},
+            # Priorità alta: consegna immediata anche in standby (un "in arrivo tra 5
+            # minuti" in ritardo è inutile); canale ad alta importanza → banner.
+            android=messaging.AndroidConfig(
+                priority="high",
+                notification=messaging.AndroidNotification(channel_id=ANDROID_CHANNEL_ID),
+            ),
         )
         try:
             messaging.send(fcm_message, app=app)

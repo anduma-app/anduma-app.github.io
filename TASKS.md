@@ -12,7 +12,9 @@ Priorità: P0 bug che produce dati errati o blocca, P1 importante prima del rila
 - Mobile: `flutter analyze` pulito, `flutter test` 5/5 offline; build debug Android con e senza
   `google-services.json`; verificata su emulatore Pixel 9 API 35 (ricerca, arrivi, preferiti,
   mappa, permesso notifiche al primo alert, consentito e negato).
-- Non verificati: build release firmata, invio push reale (servono chiave Firebase e device).
+- Push FCM reale su emulatore: banner ad app in background (canale ad alta importanza, icona di
+  stato), tocco sulla notifica → Arrivi della fermata.
+- Non verificata: build release firmata.
 
 ## Fatto
 
@@ -41,15 +43,19 @@ Mobile
 - [x] P1 Release Android: cleartext solo debug, google-services opzionale, firma da `key.properties`,
       nome "Transito Torino"; Manrope inclusa; flutter_map 8 con cache tile.
 - [x] P2 Test del client API senza rete; piattaforma reale nella registrazione.
+- [x] P1 Push fuori dall'app poco visibili e ritardabili: canale Android ad alta importanza con
+      icona di stato, invio FCM a priorità alta.
 
 ## Da fare
 
 - [ ] P1 Icona dell'app (oggi quella di default di Flutter) e nome definitivo.
 - [ ] P1 Privacy policy (l'app invia token FCM e id device) e scheda Play Store.
-- [ ] P1 Build release firmata e prova di una push reale end-to-end.
+- [ ] P1 Build release firmata; push end-to-end da un alert reale su telefono.
 - [ ] P2 Firebase: firebase_core 5 / firebase_messaging 17.
-- [ ] P2 Canale notifiche Android di default; pulsante "posizione" che ricentra solo su Torino.
-- [ ] P2 Strike card: mostrare la categoria e una sola data se inizio = fine.
+- [ ] P2 Pulsante "posizione" che ricentra solo su Torino.
+- [ ] P2 Strike card: una sola data se inizio = fine (il dettaglio completo è in ROADMAP).
+- [ ] P2 Fermata aperta da notifica: l'intestazione mostra lo `stop_id` (es. 1687) invece del
+      numero di palina (253).
 - [ ] P2 Dead code segnalato dall'audit: `TransitLine.mode` duplicato, `cupertino_icons` inutilizzato,
       commento su sync preferiti in `favorites_store.dart`, versione "v0.1 (MVP)" fissa in Info.
 

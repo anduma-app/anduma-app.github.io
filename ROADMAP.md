@@ -45,6 +45,14 @@ riceve una push di alert.
 
 ## Dopo (non pianificato)
 
+- Pin personali sulla mappa con nome scelto dall'utente (es. "Casa", "Ufficio"), salvati sul device.
+- Dagli arrivi in fermata, tocco su un passaggio → mappa centrata sul mezzo di quella corsa
+  (`trip_id` già presente in arrivi e posizioni).
+- Alert per scioperi e avvisi di una linea più facili da trovare: oggi esistono solo dalla campana
+  di una linea già nei preferiti; renderli attivabili anche da Avvisi e dalla mappa. Nota: gli
+  scioperi MIT non indicano le linee, quindi un alert sciopero "per linea" vale per tutta la rete.
+- Scioperi cliccabili con dettaglio: fasce orarie/modalità, sindacati, categoria, data di
+  proclamazione (campi già presenti nel feed MIT, oggi non mostrati).
 - Ricerca fermate ordinata per vicinanza (permesso posizione).
 - Mini-mappa / tap-per-mappa sul risultato di ricerca.
 - Reminder sciopero il giorno prima e il mattino stesso; avviso sciopero anche a chi ha solo preferiti.
