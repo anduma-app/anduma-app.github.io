@@ -59,9 +59,12 @@ class Settings(BaseSettings):
     # Vuoto → cache in-memory (sviluppo). In produzione: redis://host:6379/0
     redis_url: str = ""
 
+    # --- Logging ---
+    log_level: str = "info"
+
     # --- Scheduler / motore alert ---
-    # Disattivato di default: i job non partono (né fanno polling) finché non
-    # viene abilitato esplicitamente (es. nel processo di produzione).
+    # In produzione gira nel processo dedicato ``python -m app.worker``. Questo flag
+    # lo avvia invece dentro il processo API (comodo in sviluppo, una sola replica).
     scheduler_enabled: bool = False
     imminent_interval_s: int = 15
     strike_interval_s: int = 3600

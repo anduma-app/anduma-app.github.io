@@ -14,8 +14,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Health(BaseModel):
-    status: str = "ok"
+    status: str = Field("ok", description="'ok' | 'degraded' (GTFS non caricato o DB giù)")
     gtfs_loaded: bool = False
+    gtfs_age_s: int | None = Field(None, description="Secondi dall'ultimo caricamento GTFS")
     routes: int = 0
     stops: int = 0
     db: bool = False

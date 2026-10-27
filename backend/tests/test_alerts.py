@@ -166,3 +166,46 @@ def test_build_scheduler_has_alert_jobs(session_factory):
     assert job_ids == {"imminent", "strike", "service_alert"}
     # Non avviato: nessun polling, nessun thread.
     assert not scheduler.running
+
+
+def test_strike_notified_once_per_device_with_many_subscriptions(session_factory, strikes_csv):
+    with session_factory() as s:
+        dev = Device(platform="android", fcm_token="tok-multi")
+        dev.subscriptions += [
+            Subscription(kind="strike", line="10"),
+            Subscription(kind="strike", line="15"),
+        ]
+        s.add(dev)
+        s.commit()
+    strikes = filter_for_torino(parse_strikes_csv(strikes_csv))
+    dispatcher = InProcessDispatcher()
+    with session_factory() as s:
+        assert evaluate_strikes(s, strikes, dispatcher, now=FUTURE_TS) == len(strikes)
+        # Una nuova sottoscrizione dello stesso device non fa ripartire le push.
+        s.add(Subscription(kind="strike", line="4", device_id=dev.id))
+        s.commit()
+        assert evaluate_strikes(s, strikes, dispatcher, now=FUTURE_TS) == 0
+
+
+def test_service_alert_notified_once_per_device(session_factory, gtfs, alerts_bytes):
+    with session_factory() as s:
+        dev = Device(platform="android", fcm_token="tok-alert-multi")
+        dev.subscriptions += [
+            Subscription(kind="line_alert", line="10"),
+            Subscription(kind="line_alert", line="10"),
+        ]
+        s.add(dev)
+        s.commit()
+    dispatcher = InProcessDispatcher()
+    with session_factory() as s:
+        assert evaluate_service_alerts(s, parse_feed(alerts_bytes), gtfs, dispatcher) == 1
+
+
+def test_expired_dedup_rows_are_purged(session_factory, gtfs, trip_updates_bytes):
+    _device_with_sub(session_factory, kind="imminent", stop_id="350", line="10", threshold_min=5)
+    feed = parse_feed(trip_updates_bytes)
+    with session_factory() as s:
+        assert evaluate_imminent(s, feed, gtfs, InProcessDispatcher(), now=FUTURE_TS) == 1
+        # Ben oltre la scadenza: la riga sparisce, il trip (ormai passato) non rinotifica.
+        evaluate_imminent(s, feed, gtfs, InProcessDispatcher(), now=FUTURE_TS + 86_400)
+        assert s.scalars(select(NotifiedEvent)).all() == []

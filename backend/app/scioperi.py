@@ -108,7 +108,7 @@ def filter_for_torino(strikes: list[Strike], settings: Settings | None = None) -
 _DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y")
 
 
-def _parse_date(value: str | None) -> dt.date | None:
+def parse_date(value: str | None) -> dt.date | None:
     """Parsa una data in vari formati comuni; None se non riconoscibile."""
     if not value:
         return None
@@ -141,8 +141,8 @@ def is_active_strike(strike: Strike, today: dt.date | None = None) -> bool:
     today = today or clock.today()
     lo = today - dt.timedelta(days=_GRACE_DAYS)
     hi = today + dt.timedelta(days=_HORIZON_DAYS)
-    start = _parse_date(strike.start_date)
-    end = _parse_date(strike.end_date)
+    start = parse_date(strike.start_date)
+    end = parse_date(strike.end_date)
     if start is None and end is None:
         return True
     # Sciopero ancora in corso: iniziato nel passato ma con fine plausibile ≥ oggi.
@@ -172,6 +172,7 @@ __all__ = [
     "is_relevant_for_torino",
     "filter_for_torino",
     "is_active_strike",
+    "parse_date",
     "filter_upcoming",
     "download_strikes_csv",
 ]

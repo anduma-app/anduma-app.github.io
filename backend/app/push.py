@@ -12,6 +12,7 @@ Firebase, configurazione esterna).
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -20,6 +21,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from .alerts import Dispatcher, InProcessDispatcher, PushMessage
 from .config import Settings, get_settings
 from .db import Device
+
+log = logging.getLogger(__name__)
 
 
 class InvalidTokenError(Exception):
@@ -61,7 +64,7 @@ class FirebaseSender:
         return self._app
 
     def send(self, token: str, message: PushMessage) -> None:
-        from firebase_admin import messaging
+        from firebase_admin import exceptions, messaging
 
         app = self._ensure_app()
         fcm_message = messaging.Message(
@@ -73,8 +76,14 @@ class FirebaseSender:
             messaging.send(fcm_message, app=app)
         except (messaging.UnregisteredError, messaging.SenderIdMismatchError) as exc:
             raise InvalidTokenError(token) from exc
+        except exceptions.InvalidArgumentError as exc:
+            # FCM risponde INVALID_ARGUMENT anche per payload errati: si rimuove il
+            # device solo se l'errore riguarda il token.
+            if "registration token" in str(exc).lower():
+                raise InvalidTokenError(token) from exc
+            raise
         except ValueError as exc:
-            # Token malformato → da rimuovere.
+            # Token malformato (validazione locale dell'SDK) → da rimuovere.
             raise InvalidTokenError(token) from exc
 
 
@@ -101,6 +110,7 @@ class PushService:
                 result.invalid_tokens.append(token)
                 invalid_device_ids.add(device.id)
             except Exception:
+                log.exception("Invio push fallito (device %s)", msg.device_id)
                 result.failed += 1
 
         # Cleanup: rimuove i device con token non più valido (cascade su
@@ -110,6 +120,13 @@ class PushService:
             if device is not None:
                 session.delete(device)
         session.commit()
+        if messages:
+            log.info(
+                "Push: %d inviate, %d fallite, %d token rimossi",
+                result.sent,
+                result.failed,
+                len(result.invalid_tokens),
+            )
         return result
 
 

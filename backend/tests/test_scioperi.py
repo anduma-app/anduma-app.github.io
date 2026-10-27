@@ -40,9 +40,7 @@ def test_is_active_strike_date_formats():
 def test_is_active_strike_rejects_typo_future_end():
     """Refuso nel dato MIT: inizio 2017, fine '2107' (per 2017). Va scartato."""
     today = dt.date(2026, 6, 6)
-    assert not is_active_strike(
-        Strike(start_date="2017-07-06", end_date="2107-07-06"), today
-    )
+    assert not is_active_strike(Strike(start_date="2017-07-06", end_date="2107-07-06"), today)
     # Anche una fine assurdamente futura da sola non basta a tenerlo.
     assert not is_active_strike(Strike(start_date=None, end_date="2107-07-06"), today)
 

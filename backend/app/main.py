@@ -7,16 +7,16 @@ client parla esclusivamente con questa API.
 from __future__ import annotations
 
 import asyncio
+import time
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from starlette.concurrency import run_in_threadpool
 
 from . import realtime, scioperi
-from .alerts import InProcessDispatcher, build_scheduler
 from .cache import RedisCache
 from .config import get_settings
-from .db import SessionLocal, db_healthcheck
+from .db import db_healthcheck
 from .me import router as me_router
 from .models import (
     AlertsResponse,
@@ -29,7 +29,7 @@ from .models import (
     VehiclesResponse,
 )
 from .provider import DataProvider, LiveProvider
-from .push import build_push_service, make_push_processor
+from .worker import configure_logging, create_scheduler
 from .ws import ConnectionManager
 
 ATTRIBUTION = "Dati: Città di Torino / GTT (CC BY 4.0); scioperi MIT; mappa © OpenStreetMap"
@@ -38,26 +38,18 @@ ATTRIBUTION = "Dati: Città di Torino / GTT (CC BY 4.0); scioperi MIT; mappa © 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    configure_logging(settings)
     provider = LiveProvider()
     app.state.provider = provider
-    app.state.dispatcher = InProcessDispatcher()
     app.state.scheduler = None
     app.state.ws_manager = ConnectionManager(settings.ws_max_connections)
     app.state.ws_interval_s = settings.ws_interval_s
     # Pre-carica il GTFS statico (tollerante a rete assente).
     with suppress(Exception):
-        provider.gtfs()
-    # Scheduler alert: disattivato di default (non fa polling finché non abilitato).
+        await run_in_threadpool(provider.gtfs)
+    # Scheduler nel processo API: solo per sviluppo (in produzione: app.worker).
     if settings.scheduler_enabled:
-        push_service = build_push_service(settings)  # None se FCM non abilitato
-        push_processor = (
-            make_push_processor(push_service, app.state.dispatcher, SessionLocal)
-            if push_service is not None
-            else None
-        )
-        scheduler = build_scheduler(
-            provider, app.state.dispatcher, SessionLocal, settings, push_processor=push_processor
-        )
+        scheduler = create_scheduler(provider, settings)
         scheduler.start()
         app.state.scheduler = scheduler
     try:
@@ -93,12 +85,16 @@ def health(provider: DataProvider = Depends(get_provider)) -> Health:
     cache = getattr(provider, "cache", None)
     if isinstance(cache, RedisCache):
         cache_backend = "redis" if cache.ping() else "redis-down"
+    loaded_at = getattr(provider, "gtfs_loaded_at", None)
+    db_ok = db_healthcheck()
+    gtfs_ok = bool(gtfs.routes)
     return Health(
-        status="ok",
-        gtfs_loaded=bool(gtfs.routes),
+        status="ok" if db_ok and gtfs_ok else "degraded",
+        gtfs_loaded=gtfs_ok,
+        gtfs_age_s=int(time.time() - loaded_at) if loaded_at is not None else None,
         routes=len(gtfs.routes),
         stops=len(gtfs.stops),
-        db=db_healthcheck(),
+        db=db_ok,
         cache=cache_backend,
     )
 
@@ -153,9 +149,7 @@ def line_shape(
     gtfs = provider.gtfs()
     return LineShape(
         line=line,
-        polylines=[
-            ShapePath(direction=d, points=pts) for d, pts in gtfs.shape_for_line(line)
-        ],
+        polylines=[ShapePath(direction=d, points=pts) for d, pts in gtfs.shape_for_line(line)],
         stops=gtfs.stops_for_line(line),
     )
 

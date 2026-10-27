@@ -19,26 +19,32 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import logging
 import time
+from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
 from google.transit import gtfs_realtime_pb2
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from .clock import ROME
 from .config import Settings, get_settings
 from .db import NotifiedEvent, Subscription
 from .gtfs_static import GtfsStatic
 from .models import Strike
 from .realtime import alert_entities, arrivals_for_stop, parse_feed
-from .scioperi import filter_for_torino, filter_upcoming, parse_strikes_csv
+from .scioperi import filter_for_torino, filter_upcoming, parse_date, parse_strikes_csv
+
+log = logging.getLogger(__name__)
 
 # Buffer oltre l'ETA stimato prima che la dedup scada (il mezzo è passato).
 _IMMINENT_TTL_BUFFER_S = 120
-# Per gli scioperi non abbiamo sempre una data di fine affidabile: TTL lungo.
-_STRIKE_TTL_DAYS = 30
+# Uno sciopero non si rinotifica finché non è passato (date assenti: orizzonte MIT).
+_STRIKE_TTL_GRACE_DAYS = 2
+_STRIKE_TTL_FALLBACK_DAYS = 400
 # Avvisi di servizio: ri-notifica al più una volta a settimana se ancora attivi.
 _ALERT_TTL_DAYS = 7
 
@@ -80,6 +86,36 @@ def _now_dt(now_ts: float) -> dt.datetime:
     return dt.datetime.fromtimestamp(now_ts, dt.UTC)
 
 
+def _purge_expired(session: Session, now_dt: dt.datetime) -> None:
+    """Rimuove le voci di deduplica scadute: la tabella resta piccola e la chiave riutilizzabile."""
+    session.execute(delete(NotifiedEvent).where(NotifiedEvent.expires_at <= now_dt))
+
+
+def _by_device(subs) -> dict[int, list[Subscription]]:
+    grouped: dict[int, list[Subscription]] = defaultdict(list)
+    for sub in subs:
+        grouped[sub.device_id].append(sub)
+    return grouped
+
+
+def _claim_for_device(
+    session: Session,
+    subs: list[Subscription],
+    key: str,
+    now_dt: dt.datetime,
+    expires: dt.datetime,
+) -> bool:
+    """Registra l'evento per tutte le sottoscrizioni del device.
+
+    True se il device non l'aveva ancora ricevuto (va notificato una sola volta,
+    anche se ha più sottoscrizioni che lo riguardano).
+    """
+    fresh = [sub for sub in subs if not _already_notified(session, sub.id, key, now_dt)]
+    for sub in fresh:
+        session.add(NotifiedEvent(subscription_id=sub.id, dedup_key=key, expires_at=expires))
+    return len(fresh) == len(subs)
+
+
 def _already_notified(
     session: Session, subscription_id: int, dedup_key: str, now_dt: dt.datetime
 ) -> bool:
@@ -106,6 +142,7 @@ def evaluate_imminent(
     """Valuta le sottoscrizioni ``imminent`` sul feed dato. Ritorna gli accodati."""
     now_ts = now if now is not None else time.time()
     now_dt = _now_dt(now_ts)
+    _purge_expired(session, now_dt)
     subs = session.scalars(
         select(Subscription).where(Subscription.kind == "imminent", Subscription.active.is_(True))
     ).all()
@@ -163,16 +200,25 @@ def strike_key(strike: Strike) -> str:
     return f"strike:{digest}"
 
 
+def _strike_expiry(strike: Strike, now_dt: dt.datetime) -> dt.datetime:
+    """Scadenza della deduplica: qualche giorno dopo la fine (o l'inizio) dello sciopero."""
+    last = parse_date(strike.end_date) or parse_date(strike.start_date)
+    if last is None:
+        return now_dt + dt.timedelta(days=_STRIKE_TTL_FALLBACK_DAYS)
+    end_of_day = dt.datetime.combine(last + dt.timedelta(days=_STRIKE_TTL_GRACE_DAYS), dt.time())
+    return max(end_of_day.replace(tzinfo=ROME), now_dt + dt.timedelta(days=1))
+
+
 def evaluate_strikes(
     session: Session,
     strikes: list[Strike],
     dispatcher: Dispatcher,
     now: float | None = None,
 ) -> int:
-    """Notifica le sottoscrizioni ``strike`` per ogni nuovo sciopero. Idempotente."""
+    """Notifica ogni device con sottoscrizioni ``strike`` una volta per sciopero. Idempotente."""
     now_ts = now if now is not None else time.time()
     now_dt = _now_dt(now_ts)
-    expires = now_dt + dt.timedelta(days=_STRIKE_TTL_DAYS)
+    _purge_expired(session, now_dt)
     subs = session.scalars(
         select(Subscription).where(Subscription.kind == "strike", Subscription.active.is_(True))
     ).all()
@@ -180,19 +226,19 @@ def evaluate_strikes(
     enqueued = 0
     for strike in strikes:
         key = strike_key(strike)
-        for sub in subs:
-            if _already_notified(session, sub.id, key, now_dt):
+        expires = _strike_expiry(strike, now_dt)
+        for device_id, dsubs in _by_device(subs).items():
+            if not _claim_for_device(session, dsubs, key, now_dt, expires):
                 continue
-            session.add(NotifiedEvent(subscription_id=sub.id, dedup_key=key, expires_at=expires))
             when = strike.start_date or "prossimamente"
             dispatcher.enqueue(
                 PushMessage(
-                    device_id=sub.device_id,
+                    device_id=device_id,
                     title="Sciopero trasporto pubblico",
                     body=f"Sciopero TPL ({strike.area or 'nazionale'}) — {when}",
                     data={
                         "kind": "strike",
-                        "line": sub.line or "",
+                        "line": dsubs[0].line or "",
                         "area": strike.area or "",
                         "start_date": strike.start_date or "",
                     },
@@ -214,15 +260,15 @@ def evaluate_service_alerts(
     """Notifica le sottoscrizioni ``line_alert`` per gli avvisi sulle loro linee.
 
     Deduplica per ``(subscription, entity.id)``: un avviso che persiste non
-    rinotifica finché non scade il TTL. Idempotente.
+    rinotifica finché non scade il TTL. Un device riceve una sola push per avviso
+    anche se segue più linee coinvolte. Idempotente.
     """
     now_ts = now if now is not None else time.time()
     now_dt = _now_dt(now_ts)
+    _purge_expired(session, now_dt)
     expires = now_dt + dt.timedelta(days=_ALERT_TTL_DAYS)
     subs = session.scalars(
-        select(Subscription).where(
-            Subscription.kind == "line_alert", Subscription.active.is_(True)
-        )
+        select(Subscription).where(Subscription.kind == "line_alert", Subscription.active.is_(True))
     ).all()
     if not subs:
         return 0
@@ -230,22 +276,22 @@ def evaluate_service_alerts(
     entities = alert_entities(feed, gtfs)
     enqueued = 0
     for entity_id, alert in entities:
-        for sub in subs:
-            if not sub.line or sub.line not in alert.lines:
+        matching = [sub for sub in subs if sub.line and sub.line in alert.lines]
+        key = f"alert:{entity_id}"
+        for device_id, dsubs in _by_device(matching).items():
+            if not _claim_for_device(session, dsubs, key, now_dt, expires):
                 continue
-            key = f"alert:{entity_id}"
-            if _already_notified(session, sub.id, key, now_dt):
-                continue
-            session.add(NotifiedEvent(subscription_id=sub.id, dedup_key=key, expires_at=expires))
+            lines = sorted({sub.line for sub in dsubs if sub.line})
+            label = f"Linea {lines[0]}" if len(lines) == 1 else f"Linee {', '.join(lines)}"
             header = alert.header or "Avviso di servizio"
             dispatcher.enqueue(
                 PushMessage(
-                    device_id=sub.device_id,
-                    title=f"Linea {sub.line}: {header}",
+                    device_id=device_id,
+                    title=f"{label}: {header}",
                     body=alert.description or header,
                     data={
                         "kind": "line_alert",
-                        "line": sub.line,
+                        "line": lines[0],
                         "effect": alert.effect or "",
                     },
                 )
@@ -262,7 +308,8 @@ def run_imminent(provider, dispatcher: Dispatcher, session_factory: sessionmaker
         feed = parse_feed(provider.trip_updates_bytes())
         gtfs = provider.gtfs()
     except Exception:
-        return 0  # sorgente irraggiungibile: salta questo giro
+        log.warning("Job imminent: sorgenti non disponibili, salto il giro", exc_info=True)
+        return 0
     with session_factory() as session:
         return evaluate_imminent(session, feed, gtfs, dispatcher)
 
@@ -272,6 +319,7 @@ def run_strikes(provider, dispatcher: Dispatcher, session_factory: sessionmaker[
     try:
         strikes = filter_upcoming(filter_for_torino(parse_strikes_csv(provider.strikes_csv())))
     except Exception:
+        log.warning("Job strike: registro scioperi non disponibile", exc_info=True)
         return 0
     with session_factory() as session:
         return evaluate_strikes(session, strikes, dispatcher)
@@ -285,6 +333,7 @@ def run_service_alerts(
         feed = parse_feed(provider.alerts_bytes())
         gtfs = provider.gtfs()
     except Exception:
+        log.warning("Job service_alert: feed avvisi non disponibile", exc_info=True)
         return 0
     with session_factory() as session:
         return evaluate_service_alerts(session, feed, gtfs, dispatcher)
@@ -305,7 +354,7 @@ def build_scheduler(
     from apscheduler.schedulers.background import BackgroundScheduler
 
     settings = settings or get_settings()
-    scheduler = BackgroundScheduler(timezone="Europe/Rome")
+    scheduler = BackgroundScheduler(timezone=ROME)
     scheduler.add_job(
         run_imminent,
         "interval",

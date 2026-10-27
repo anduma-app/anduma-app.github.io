@@ -16,6 +16,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     create_engine,
     text,
 )
@@ -87,6 +88,9 @@ class NotifiedEvent(Base):
     """Deduplica delle notifiche: una riga per (subscription, dedup_key)."""
 
     __tablename__ = "notified_events"
+    __table_args__ = (
+        UniqueConstraint("subscription_id", "dedup_key", name="uq_notified_events_sub_key"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     subscription_id: Mapped[int] = mapped_column(
