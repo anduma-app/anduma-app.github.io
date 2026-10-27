@@ -1,8 +1,11 @@
-# Stack di sviluppo locale: PostgreSQL + Redis.
+# Stack locale: PostgreSQL + Redis.
 # Avvio:  docker compose -f infra/docker-compose.yml up -d
-# Il backend vi si collega via:
+# Il backend (uvicorn locale) vi si collega via:
 #   TT_DATABASE_URL=postgresql+psycopg://transito:transito@localhost:5432/transito
 #   TT_REDIS_URL=redis://localhost:6379/0
+#
+# Stack completo come in produzione (API + worker in container), profilo "app":
+#   docker compose -f infra/docker-compose.yml --profile app up -d --build
 
 services:
   postgres:
@@ -36,6 +39,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
+
+  api:
+    profiles: ["app"]
+    build: ../backend
+    environment: &backend-env
+      TT_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-transito}:${POSTGRES_PASSWORD:-transito}@postgres:5432/${POSTGRES_DB:-transito}
+      TT_REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
+  # Scheduler alert + push: una sola replica. Per l'invio reale servono
+  # TT_FCM_ENABLED=true e la service account montata (vedi docs/FIREBASE_SETUP.md).
+  worker:
+    profiles: ["app"]
+    build: ../backend
+    command: ["python", "-m", "app.worker"]
+    environment: *backend-env
+    depends_on:
+      api: { condition: service_started }
     restart: unless-stopped
 
 volumes:
