@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 
 def test_health(client):
     r = client.get("/health")
@@ -55,7 +57,9 @@ def test_vehicles(client):
     assert {v["vehicle_id"] for v in body["vehicles"]} == {"BUS001", "BUS002"}
 
 
-def test_alerts(client):
+def test_alerts(client, monkeypatch):
+    # Le date delle fixture scioperi sono fisse: congela "oggi" prima di esse.
+    monkeypatch.setattr("app.scioperi._today", lambda: dt.date(2026, 6, 6))
     r = client.get("/alerts")
     assert r.status_code == 200
     body = r.json()

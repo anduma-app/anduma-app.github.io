@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import io
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -127,6 +128,11 @@ _GRACE_DAYS = 2  # tolleranza per scioperi iniziati da poco / errori di fuso
 _HORIZON_DAYS = 400
 
 
+def _today() -> dt.date:
+    """Data odierna a Torino (non quella del server, che in container è spesso UTC)."""
+    return dt.datetime.now(ZoneInfo("Europe/Rome")).date()
+
+
 def is_active_strike(strike: Strike, today: dt.date | None = None) -> bool:
     """True se lo sciopero è in corso o imminente, entro una finestra plausibile.
 
@@ -137,7 +143,7 @@ def is_active_strike(strike: Strike, today: dt.date | None = None) -> bool:
     le date assurdamente future. Se nessuna data è parsabile, NON scartiamo
     (difensivo: meglio mostrarne uno in più che nascondere uno sciopero reale).
     """
-    today = today or dt.date.today()
+    today = today or _today()
     lo = today - dt.timedelta(days=_GRACE_DAYS)
     hi = today + dt.timedelta(days=_HORIZON_DAYS)
     start = _parse_date(strike.start_date)
