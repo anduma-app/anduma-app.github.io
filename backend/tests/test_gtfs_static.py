@@ -140,3 +140,35 @@ def test_empty_gtfs_is_safe():
     assert empty.lines() == []
     assert empty.search_stops("x") == []
     assert empty.stop("350") is None
+
+
+def test_schedule_indexes_yesterday_and_today():
+    """L'indice orari include le corse di ieri (notturne oltre mezzanotte) e di oggi."""
+    import datetime as dt
+    import io
+    import zipfile
+
+    files = {
+        "routes.txt": "route_id,route_short_name\nR1,1\n",
+        "stops.txt": "stop_id,stop_name\nS,Stop\n",
+        "trips.txt": "route_id,service_id,trip_id\nR1,MON,TMON\nR1,TUE,TTUE\nR1,WED,TWED\n",
+        "calendar.txt": (
+            "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+            "start_date,end_date\n"
+            "MON,1,0,0,0,0,0,0,20300101,20301231\n"
+            "TUE,0,1,0,0,0,0,0,20300101,20301231\n"
+            "WED,0,0,1,0,0,0,0,20300101,20301231\n"
+        ),
+        "stop_times.txt": (
+            "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
+            "TMON,24:30:00,24:30:00,S,1\nTTUE,08:00:00,08:00:00,S,1\nTWED,08:00:00,08:00:00,S,1\n"
+        ),
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for name, text in files.items():
+            zf.writestr(name, text)
+    tuesday = dt.date(2030, 1, 8)
+    gtfs = GtfsStatic.from_zip_bytes(buf.getvalue(), schedule_for_date=tuesday)
+    assert set(gtfs.schedule) == {"TMON", "TTUE"}
+    assert gtfs.trip_dates == {"TMON": (dt.date(2030, 1, 7),), "TTUE": (tuesday,)}

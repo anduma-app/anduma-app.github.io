@@ -46,6 +46,8 @@ class Settings(BaseSettings):
 
     # --- HTTP ---
     http_timeout: float = 15.0
+    # Attesa prima di ritentare un download GTFS/scioperi fallito (si serve lo snapshot precedente).
+    retry_backoff_s: int = 300
 
     # --- Persistenza ---
     # SQLite per iniziare; in produzione PostgreSQL via env, es.

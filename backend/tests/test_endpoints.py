@@ -59,7 +59,7 @@ def test_vehicles(client):
 
 def test_alerts(client, monkeypatch):
     # Le date delle fixture scioperi sono fisse: congela "oggi" prima di esse.
-    monkeypatch.setattr("app.scioperi._today", lambda: dt.date(2026, 6, 6))
+    monkeypatch.setattr("app.clock.today", lambda: dt.date(2026, 6, 6))
     r = client.get("/alerts")
     assert r.status_code == 200
     body = r.json()

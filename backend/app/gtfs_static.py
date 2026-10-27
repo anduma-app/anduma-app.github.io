@@ -121,12 +121,15 @@ class GtfsStatic:
     stops: dict[str, dict[str, str]] = field(default_factory=dict)
     # trip_id -> {route_id, headsign}
     trips: dict[str, dict[str, str]] = field(default_factory=dict)
-    # Orari programmati delle SOLE corse attive nella data: serve perché i feed
+    # Orari programmati delle SOLE corse attive ieri o oggi: serve perché i feed
     # RT di GTT indicano la fermata con stop_sequence (non stop_id) e spesso solo
-    # col delay. trip_id -> {stop_sequence: (stop_id, arrival_secs|None)}
+    # col delay. Ieri è incluso per le corse notturne oltre la mezzanotte (orari
+    # GTFS ≥ 24:00). trip_id -> {stop_sequence: (stop_id, arrival_secs|None)}
     schedule: dict[str, dict[int, tuple[str, int | None]]] = field(default_factory=dict)
-    # Data di servizio per cui è costruito ``schedule`` (base per il delay).
+    # Giorno di riferimento ("oggi") per cui è costruito ``schedule``.
     schedule_date: dt.date | None = None
+    # Date di servizio (ieri e/o oggi) in cui ogni corsa indicizzata è attiva.
+    trip_dates: dict[str, tuple[dt.date, ...]] = field(default_factory=dict)
     # Tracciati: shape_id -> [(lat, lon), ...] ordinati per sequenza (per la
     # sovrimpressione del percorso sulla mappa). Da ``shapes.txt``.
     shapes: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
@@ -140,7 +143,7 @@ class GtfsStatic:
         """Costruisce lo snapshot da un GTFS ZIP (bytes).
 
         Se ``schedule_for_date`` è fornita, costruisce anche l'indice orari per le
-        sole corse in servizio quel giorno (così resta leggero: ~1/7 del totale).
+        sole corse in servizio quel giorno e il precedente (così resta leggero).
         """
         gtfs = cls()
         gtfs.schedule_date = schedule_for_date
@@ -198,15 +201,17 @@ class GtfsStatic:
             self.shapes[sid] = [(lat, lon) for _seq, lat, lon in pts]
 
     def _build_schedule(self, zf: zipfile.ZipFile, on_date: dt.date) -> None:
-        """Indicizza ``stop_times.txt`` per le corse attive in ``on_date`` (streaming)."""
+        """Indicizza ``stop_times.txt`` per le corse attive ieri o in ``on_date`` (streaming)."""
         if "stop_times.txt" not in zf.namelist():
             return
-        services = _active_services(zf, on_date)
-        active_trips = {
-            tid
-            for tid, row in self.trips.items()
-            if (row.get("service_id") or "").strip() in services
-        }
+        days = (on_date - dt.timedelta(days=1), on_date)
+        services_by_day = [(d, _active_services(zf, d)) for d in days]
+        for tid, row in self.trips.items():
+            sid = (row.get("service_id") or "").strip()
+            dates = tuple(d for d, services in services_by_day if sid in services)
+            if dates:
+                self.trip_dates[tid] = dates
+        active_trips = self.trip_dates.keys()
         if not active_trips:
             return
         with zf.open("stop_times.txt") as fh:
@@ -285,11 +290,7 @@ class GtfsStatic:
         route_ids = set(self.short_name_to_route_ids.get(short_name, []))
         if not route_ids:
             return []
-        return [
-            tid
-            for tid, row in self.trips.items()
-            if (row.get("route_id") or "") in route_ids
-        ]
+        return [tid for tid, row in self.trips.items() if (row.get("route_id") or "") in route_ids]
 
     def shape_for_line(
         self, short_name: str, limit: int = 8
@@ -356,9 +357,7 @@ class GtfsStatic:
                     desc = long_name
                     break
             mode = self.mode_for_route_id(route_ids[0]) if route_ids else "bus"
-            out.append(
-                Line(line=short, description=desc, route_ids=list(route_ids), mode=mode)
-            )
+            out.append(Line(line=short, description=desc, route_ids=list(route_ids), mode=mode))
         out.sort(key=_line_sort_key)
         return out
 
@@ -404,11 +403,24 @@ _STOP_NAME_PREFIX = re.compile(r"^fermata\s+\S+\s*-\s*", re.IGNORECASE)
 
 # Abbreviazioni toponomastiche GTT (stop_desc è in MAIUSCOLO).
 _DESC_ABBR = {
-    "V.": "Via", "V": "Via", "VIA": "Via",
-    "C.": "Corso", "C.SO": "Corso", "CSO": "Corso", "CORSO": "Corso",
-    "V.LE": "Viale", "VLE": "Viale", "VIALE": "Viale",
-    "P.": "Piazza", "P.ZA": "Piazza", "P.ZZA": "Piazza", "PZA": "Piazza", "PIAZZA": "Piazza",
-    "STR.": "Strada", "STRADA": "Strada", "LARGO": "Largo",
+    "V.": "Via",
+    "V": "Via",
+    "VIA": "Via",
+    "C.": "Corso",
+    "C.SO": "Corso",
+    "CSO": "Corso",
+    "CORSO": "Corso",
+    "V.LE": "Viale",
+    "VLE": "Viale",
+    "VIALE": "Viale",
+    "P.": "Piazza",
+    "P.ZA": "Piazza",
+    "P.ZZA": "Piazza",
+    "PZA": "Piazza",
+    "PIAZZA": "Piazza",
+    "STR.": "Strada",
+    "STRADA": "Strada",
+    "LARGO": "Largo",
 }
 
 

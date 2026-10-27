@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.gtfs_static import GtfsStatic
-from app.main import app, get_provider
+from app.main import app
 
 FIX = Path(__file__).parent / "fixtures"
 
@@ -59,11 +59,17 @@ class FakeProvider:
     def strikes_csv(self) -> str:
         return (FIX / "scioperi.csv").read_text(encoding="utf-8")
 
+    def close(self) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True)
+def no_live_provider(monkeypatch, gtfs: GtfsStatic):
+    """Il lifespan dell'app usa il provider da fixture: nessun download nei test."""
+    monkeypatch.setattr("app.main.LiveProvider", lambda: FakeProvider(gtfs))
+
 
 @pytest.fixture
-def client(gtfs: GtfsStatic):
-    provider = FakeProvider(gtfs)
-    app.dependency_overrides[get_provider] = lambda: provider
+def client():
     with TestClient(app) as c:
         yield c
-    app.dependency_overrides.clear()

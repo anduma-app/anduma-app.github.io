@@ -12,13 +12,13 @@ from __future__ import annotations
 
 import datetime as dt
 import time
-from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import HTTPException
 from google.transit import gtfs_realtime_pb2
 
 from .cache import Cache, InMemoryCache
+from .clock import ROME
 from .config import Settings, get_settings
 from .gtfs_static import GtfsStatic
 from .models import Arrival, ServiceAlert, Vehicle
@@ -95,7 +95,6 @@ def arrivals_for_stop(
     GTFS statico e si calcola l'ETA da orario assoluto o da programmato + delay.
     """
     now_ts = int(now if now is not None else time.time())
-    base_ts = _schedule_base_ts(gtfs.schedule_date)
     out: list[Arrival] = []
     for entity in feed.entity:
         if not entity.HasField("trip_update"):
@@ -106,6 +105,7 @@ def arrivals_for_stop(
         short = gtfs.short_name_for_route_id(route_id) or gtfs.short_name_for_trip(trip_id)
         if line is not None and short != line:
             continue
+        bases = [_schedule_base_ts(d) for d in _service_dates(tu, gtfs, trip_id)]
 
         for stu in tu.stop_time_update:
             # Stop diretto se presente, altrimenti risolto da stop_sequence.
@@ -117,7 +117,7 @@ def arrivals_for_stop(
                     sid, sched_secs = resolved
             if sid != stop_id:
                 continue
-            sched_ts = _stop_time_ts(stu, base_ts, sched_secs)
+            sched_ts = _stop_time_ts(stu, bases, sched_secs, now_ts)
             if sched_ts is None:
                 continue
             eta = sched_ts - now_ts
@@ -137,38 +137,55 @@ def arrivals_for_stop(
     return out
 
 
-_TZ = ZoneInfo("Europe/Rome")
+def _service_dates(
+    tu: gtfs_realtime_pb2.TripUpdate, gtfs: GtfsStatic, trip_id: str | None
+) -> list[dt.date]:
+    """Date di servizio candidate per la corsa: ``start_date`` RT se presente,
+    altrimenti i giorni (ieri/oggi) in cui l'indice orari la dà attiva."""
+    if tu.HasField("trip") and tu.trip.start_date:
+        try:
+            return [dt.datetime.strptime(tu.trip.start_date, "%Y%m%d").date()]
+        except ValueError:
+            pass
+    dates = gtfs.trip_dates.get(trip_id or "")
+    if dates:
+        return list(dates)
+    return [gtfs.schedule_date] if gtfs.schedule_date is not None else []
 
 
-def _schedule_base_ts(service_date: dt.date | None) -> float | None:
-    """Epoch della mezzanotte locale della data di servizio (base per il delay)."""
-    if service_date is None:
-        return None
-    midnight = dt.datetime(service_date.year, service_date.month, service_date.day, tzinfo=_TZ)
-    return midnight.timestamp()
+def _schedule_base_ts(service_date: dt.date) -> int:
+    """Epoch di "mezzogiorno meno 12 h" della data di servizio, la base degli orari
+    GTFS: coincide con la mezzanotte tranne nei giorni del cambio d'ora."""
+    noon = dt.datetime(service_date.year, service_date.month, service_date.day, 12, tzinfo=ROME)
+    return int(noon.timestamp()) - 12 * 3600
 
 
-def _event_ts(event, base_ts: float | None, sched_secs: int | None) -> int | None:
-    """Timestamp d'arrivo: assoluto se presente, altrimenti programmato + delay."""
+def _event_ts(event, bases: list[int], sched_secs: int | None, now_ts: int) -> int | None:
+    """Timestamp d'arrivo: assoluto se presente, altrimenti programmato + delay.
+
+    Con più date di servizio candidate si sceglie quella più vicina ad adesso.
+    """
     if event.HasField("time") and event.time > 0:
         return event.time
-    if event.HasField("delay") and base_ts is not None and sched_secs is not None:
-        return int(base_ts) + sched_secs + event.delay
+    if event.HasField("delay") and bases and sched_secs is not None:
+        candidates = [base + sched_secs + event.delay for base in bases]
+        return min(candidates, key=lambda ts: abs(ts - now_ts))
     return None
 
 
 def _stop_time_ts(
     stu: gtfs_realtime_pb2.TripUpdate.StopTimeUpdate,
-    base_ts: float | None = None,
-    sched_secs: int | None = None,
+    bases: list[int],
+    sched_secs: int | None,
+    now_ts: int,
 ) -> int | None:
     """Arrivo (o, in mancanza, partenza): orario assoluto o programmato + delay."""
     if stu.HasField("arrival"):
-        ts = _event_ts(stu.arrival, base_ts, sched_secs)
+        ts = _event_ts(stu.arrival, bases, sched_secs, now_ts)
         if ts is not None:
             return ts
     if stu.HasField("departure"):
-        ts = _event_ts(stu.departure, base_ts, sched_secs)
+        ts = _event_ts(stu.departure, bases, sched_secs, now_ts)
         if ts is not None:
             return ts
     return None

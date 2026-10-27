@@ -108,3 +108,69 @@ def test_service_alerts(gtfs: GtfsStatic, alerts_bytes: bytes):
     assert a.description == "Lavori in corso in Corso Regina"
     assert a.effect == "DETOUR"
     assert a.lines == ["10"]
+
+
+def _delay_only_feed(trip_id: str, seq: int, delay: int, start_date: str | None = None):
+    from google.transit import gtfs_realtime_pb2
+
+    feed = gtfs_realtime_pb2.FeedMessage()
+    tu = feed.entity.add(id="tu").trip_update
+    tu.trip.trip_id = trip_id
+    if start_date:
+        tu.trip.start_date = start_date
+    stu = tu.stop_time_update.add()
+    stu.stop_sequence = seq
+    stu.arrival.delay = delay
+    return feed
+
+
+def _gtfs_one_trip(sched_secs: int, **kw) -> GtfsStatic:
+    return GtfsStatic(
+        routes={"R10A": {"route_id": "R10A", "route_short_name": "10"}},
+        short_name_to_route_ids={"10": ["R10A"]},
+        trips={"T1": {"trip_id": "T1", "route_id": "R10A"}},
+        schedule={"T1": {5: ("350", sched_secs)}},
+        **kw,
+    )
+
+
+def _rome_ts(*args) -> float:
+    import datetime as dt
+
+    from app.clock import ROME
+
+    return dt.datetime(*args, tzinfo=ROME).timestamp()
+
+
+def test_arrivals_use_rt_start_date_for_after_midnight_trip():
+    """Corsa di ieri alle 24:30 (orario GTFS), letta all'00:20 di oggi."""
+    import datetime as dt
+
+    gtfs = _gtfs_one_trip(24 * 3600 + 30 * 60, schedule_date=dt.date(2030, 1, 2))
+    feed = _delay_only_feed("T1", 5, 60, start_date="20300101")
+    now = _rome_ts(2030, 1, 2, 0, 20)
+    [a] = realtime.arrivals_for_stop(feed, gtfs, "350", now=now)
+    assert a.scheduled_ts == _rome_ts(2030, 1, 2, 0, 31)
+
+
+def test_arrivals_without_start_date_pick_closest_service_day():
+    """Senza start_date: tra ieri e oggi vince la data con l'orario più vicino ad adesso."""
+    import datetime as dt
+
+    d1, d2 = dt.date(2030, 1, 1), dt.date(2030, 1, 2)
+    gtfs = _gtfs_one_trip(9 * 3600, schedule_date=d2, trip_dates={"T1": (d1, d2)})
+    feed = _delay_only_feed("T1", 5, 0)
+    [a] = realtime.arrivals_for_stop(feed, gtfs, "350", now=_rome_ts(2030, 1, 2, 8, 50))
+    assert a.eta_seconds == 600
+
+
+def test_arrivals_correct_on_dst_change_day():
+    """Il 25/10/2026 torna l'ora solare: gli orari GTFS partono da mezzogiorno − 12 h."""
+    import datetime as dt
+
+    gtfs = _gtfs_one_trip(12 * 3600, schedule_date=dt.date(2026, 10, 25))
+    feed = _delay_only_feed("T1", 5, 0, start_date="20261025")
+    now = _rome_ts(2026, 10, 25, 11, 50)
+    [a] = realtime.arrivals_for_stop(feed, gtfs, "350", now=now)
+    assert a.scheduled_ts == _rome_ts(2026, 10, 25, 12, 0)
+    assert a.eta_seconds == 600
