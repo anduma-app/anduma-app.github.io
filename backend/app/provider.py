@@ -19,7 +19,7 @@ from .cache import Cache, get_cache
 from .config import Settings, get_settings
 from .gtfs_static import GtfsStatic, download_zip_bytes
 from .realtime import FeedFetcher
-from .scioperi import download_strikes_csv
+from .scioperi import download_strikes_rss
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class DataProvider(Protocol):
     def vehicle_positions_bytes(self) -> bytes: ...
     def trip_updates_bytes(self) -> bytes: ...
     def alerts_bytes(self) -> bytes: ...
-    def strikes_csv(self) -> str: ...
+    def strikes_feed(self) -> str: ...
 
 
 class LiveProvider:
@@ -46,7 +46,7 @@ class LiveProvider:
         self,
         settings: Settings | None = None,
         gtfs_downloader: Callable[[Settings], bytes] = download_zip_bytes,
-        strikes_downloader: Callable[[Settings], str] = download_strikes_csv,
+        strikes_downloader: Callable[[Settings], str] = download_strikes_rss,
     ):
         self._settings = settings or get_settings()
         self._cache: Cache = get_cache(self._settings)
@@ -113,7 +113,7 @@ class LiveProvider:
         return self._fetcher.alerts()
 
     # -------------------------------------------------------------- scioperi
-    def strikes_csv(self) -> str:
+    def strikes_feed(self) -> str:
         if time.time() < self._strikes_next_download:
             return self._strikes
         if not self._strikes_lock.acquire(blocking=False):

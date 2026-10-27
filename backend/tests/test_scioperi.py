@@ -1,9 +1,8 @@
-"""Test del parser difensivo del registro scioperi MIT e del filtro per Torino."""
+"""Test del parser difensivo del feed scioperi MIT e del filtro per Torino."""
 
 from __future__ import annotations
 
 import datetime as dt
-from pathlib import Path
 
 from app.models import Strike
 from app.scioperi import (
@@ -11,10 +10,8 @@ from app.scioperi import (
     filter_upcoming,
     is_active_strike,
     is_relevant_for_torino,
-    parse_strikes_csv,
+    parse_strikes_rss,
 )
-
-FIX = Path(__file__).parent / "fixtures"
 
 
 def test_filter_upcoming_drops_past_strikes():
@@ -51,50 +48,40 @@ def test_is_active_strike_keeps_ongoing_multiday():
     assert is_active_strike(Strike(start_date="2026-06-01", end_date="2026-06-08"), today)
 
 
-def test_parse_canonical_csv(strikes_csv: str):
-    strikes = parse_strikes_csv(strikes_csv)
-    assert len(strikes) == 3
+def test_parse_rss_items(strikes_feed: str):
+    strikes = parse_strikes_rss(strikes_feed)
+    assert len(strikes) == 4
     first = strikes[0]
-    assert first.start_date == "2026-06-10"
+    assert first.start_date == "10/06/2026" and first.end_date == "10/06/2026"
     assert first.sector == "Trasporto pubblico locale"
-    assert first.area == "Piemonte"
+    assert first.area == "Torino"  # provincia specifica
     assert first.unions == "FILT-CGIL"
-    assert first.raw  # riga grezza conservata
+    assert first.raw["guid"] == "http://scioperi.mit.gov.it/9001"
+    # Il separatore " - " vale solo nel titolo: la modalità resta intera.
+    assert first.raw["modalità"].endswith("SECONDA FASCIA")
+    assert strikes[1].area == "Italia"  # provincia "Tutte" → regione
 
 
-def test_filter_keeps_piemonte_and_national(strikes_csv: str):
-    strikes = parse_strikes_csv(strikes_csv)
-    kept = filter_for_torino(strikes)
-    # Piemonte (locale) + Nazionale/Generale; esclude Lombardia/Scuola.
-    relevances = {s.relevance for s in kept}
-    assert len(kept) == 2
-    assert "Locale" in relevances and "Nazionale" in relevances
-    assert all(s.area != "Lombardia" for s in kept)
+def test_filter_keeps_torino_tpl_and_national_general(strikes_feed: str):
+    kept = filter_for_torino(parse_strikes_rss(strikes_feed))
+    assert [(s.sector, s.area) for s in kept] == [
+        ("Trasporto pubblico locale", "Torino"),
+        ("Generale", "Italia"),
+    ]
 
 
-def test_defensive_parsing_renamed_columns_and_semicolon():
-    text = (FIX / "scioperi_rinominato.csv").read_text(encoding="utf-8")
-    strikes = parse_strikes_csv(text)
-    assert len(strikes) == 2
-    # Colonne rinominate ('Dal', 'Provincia', ...) comunque mappate.
-    torino = strikes[0]
-    assert torino.start_date == "2026-06-10"
-    assert torino.area == "Torino"
-    assert torino.sector == "Trasporto pubblico locale"
-
-    kept = filter_for_torino(strikes)
-    assert len(kept) == 1 and kept[0].area == "Torino"
+def test_relevance_rules():
+    assert is_relevant_for_torino(Strike(sector="Trasporto pubblico locale", area="Piemonte"))
+    assert is_relevant_for_torino(Strike(sector="Ferroviario", area="Torino"))  # Torino-Ceres
+    assert is_relevant_for_torino(Strike(sector="Plurisettoriale", relevance="Nazionale"))
+    assert not is_relevant_for_torino(Strike(sector="Aereo", relevance="Nazionale"))
+    assert not is_relevant_for_torino(Strike(sector="Ferroviario", relevance="Nazionale"))
+    assert not is_relevant_for_torino(
+        Strike(sector="Trasporto pubblico locale", relevance="Locale", area="Sicilia")
+    )
 
 
-def test_relevance_helper():
-    from app.models import Strike
-
-    assert is_relevant_for_torino(Strike(area="Piemonte"))
-    assert is_relevant_for_torino(Strike(relevance="Nazionale"))
-    assert is_relevant_for_torino(Strike(category="Sciopero generale"))
-    assert not is_relevant_for_torino(Strike(area="Sicilia", relevance="Locale"))
-
-
-def test_empty_csv_is_safe():
-    assert parse_strikes_csv("") == []
-    assert parse_strikes_csv("   \n") == []
+def test_malformed_or_empty_feed_is_safe():
+    assert parse_strikes_rss("") == []
+    assert parse_strikes_rss("<rss><channel>") == []
+    assert parse_strikes_rss("<rss><channel></channel></rss>") == []

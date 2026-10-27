@@ -195,3 +195,34 @@ def test_arrivals_propagate_delay_to_later_stops():
     # Fermata già superata (prima del primo aggiornamento): nessun arrivo.
     gtfs.schedule["T1"][1] = ("50", 8 * 3600)
     assert realtime.arrivals_for_stop(feed, gtfs, "50", now=now) == []
+
+
+def test_fetcher_serves_last_good_payload_when_source_fails():
+    import httpx
+
+    from app.cache import InMemoryCache
+    from app.config import Settings
+
+    state = {"fail": False}
+
+    def handler(request):
+        return httpx.Response(500) if state["fail"] else httpx.Response(200, content=b"ok")
+
+    cache = InMemoryCache()
+    fetcher = realtime.FeedFetcher(
+        Settings(ttl_alerts=0),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        cache=cache,
+    )
+    assert fetcher.alerts() == b"ok"
+    state["fail"] = True
+    assert fetcher.alerts() == b"ok"  # ultimo valido
+
+    empty = realtime.FeedFetcher(
+        Settings(),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        cache=InMemoryCache(),
+    )
+    with pytest.raises(Exception) as exc:
+        empty.alerts()
+    assert getattr(exc.value, "status_code", None) == 503

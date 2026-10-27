@@ -34,8 +34,8 @@ def alerts_bytes() -> bytes:
 
 
 @pytest.fixture(scope="session")
-def strikes_csv() -> str:
-    return (FIX / "scioperi.csv").read_text(encoding="utf-8")
+def strikes_feed() -> str:
+    return (FIX / "scioperi.xml").read_text(encoding="utf-8")
 
 
 class FakeProvider:
@@ -56,8 +56,8 @@ class FakeProvider:
     def alerts_bytes(self) -> bytes:
         return (FIX / "alerts.pb").read_bytes()
 
-    def strikes_csv(self) -> str:
-        return (FIX / "scioperi.csv").read_text(encoding="utf-8")
+    def strikes_feed(self) -> str:
+        return (FIX / "scioperi.xml").read_text(encoding="utf-8")
 
     def close(self) -> None:
         pass

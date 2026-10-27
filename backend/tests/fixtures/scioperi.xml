@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Ministero delle Infrastrutture e dei Trasporti - Elenco Scioperi in Programma</title>
+
+    <item>
+      <title>Data inizio: 10/06/2026 - Settore: Trasporto pubblico locale - Rilevanza: Locale - Regione: Piemonte - Provincia: Torino</title>
+      <description><![CDATA[modalità: 4 ORE: DALLE 9.00 ALLE 13.00 - SECONDA FASCIA<br/>Data fine: 10/06/2026<br/>Settore: Trasporto pubblico locale<br/>Rilevanza: Locale<br/>Regione: Piemonte<br/>Provincia: Torino<br/>Sindacati: FILT-CGIL<br/>Categoria interessata: PERSONALE SOC. DI PROVA<br/>Data proclamazione: 01/05/2026]]></description>
+      <guid>http://scioperi.mit.gov.it/9001</guid>
+    </item>
+
+    <item>
+      <title>Data inizio: 01/07/2026 - Settore: Generale - Rilevanza: Nazionale - Regione:  Italia - Provincia: Tutte</title>
+      <description><![CDATA[modalità: 4 ORE: DALLE 9.00 ALLE 13.00 - SECONDA FASCIA<br/>Data fine: 01/07/2026<br/>Settore: Generale<br/>Rilevanza: Nazionale<br/>Regione:  Italia<br/>Provincia: Tutte<br/>Sindacati: FILT-CGIL<br/>Categoria interessata: PERSONALE SOC. DI PROVA<br/>Data proclamazione: 01/05/2026]]></description>
+      <guid>http://scioperi.mit.gov.it/9002</guid>
+    </item>
+
+    <item>
+      <title>Data inizio: 15/06/2026 - Settore: Aereo - Rilevanza: Nazionale - Regione:  Italia - Provincia: Tutte</title>
+      <description><![CDATA[modalità: 4 ORE: DALLE 9.00 ALLE 13.00 - SECONDA FASCIA<br/>Data fine: 15/06/2026<br/>Settore: Aereo<br/>Rilevanza: Nazionale<br/>Regione:  Italia<br/>Provincia: Tutte<br/>Sindacati: FILT-CGIL<br/>Categoria interessata: PERSONALE SOC. DI PROVA<br/>Data proclamazione: 01/05/2026]]></description>
+      <guid>http://scioperi.mit.gov.it/9003</guid>
+    </item>
+
+    <item>
+      <title>Data inizio: 01/08/2026 - Settore: Trasporto pubblico locale - Rilevanza: Locale - Regione: Lombardia - Provincia: Milano</title>
+      <description><![CDATA[modalità: 4 ORE: DALLE 9.00 ALLE 13.00 - SECONDA FASCIA<br/>Data fine: 01/08/2026<br/>Settore: Trasporto pubblico locale<br/>Rilevanza: Locale<br/>Regione: Lombardia<br/>Provincia: Milano<br/>Sindacati: FILT-CGIL<br/>Categoria interessata: PERSONALE SOC. DI PROVA<br/>Data proclamazione: 01/05/2026]]></description>
+      <guid>http://scioperi.mit.gov.it/9004</guid>
+    </item>
+  </channel>
+</rss>

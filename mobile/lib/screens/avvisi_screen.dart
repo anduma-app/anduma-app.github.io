@@ -269,7 +269,17 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
       alerts = data.serviceAlerts;
     }
 
-    if (strikes.isEmpty && alerts.isEmpty) {
+    final unavailable = data.serviceAlertsAvailable
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(bottom: TTSpace.x3),
+            child: Text(
+              'Avvisi GTT momentaneamente non disponibili: riprova tra qualche minuto.',
+              style: TextStyle(fontSize: 13, color: c.inkMuted, height: 1.4),
+            ),
+          );
+
+    if (strikes.isEmpty && alerts.isEmpty && unavailable == null) {
       final filtered = byLine || _onlyMine;
       return StateView(
         icon: filtered ? Icons.filter_alt_off : Icons.check_circle_outline,
@@ -288,6 +298,7 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(TTSpace.x4, 0, TTSpace.x4, TTSpace.x6),
         children: [
+          ?unavailable,
           for (final s in strikes) _StrikeCard(s),
           for (final a in alerts) _ServiceAlertCard(a),
         ],

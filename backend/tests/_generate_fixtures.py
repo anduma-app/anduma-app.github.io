@@ -43,19 +43,51 @@ T2,R10B,Piazza Hermada,S1,1
 T3,R55,Lingotto,S1,0
 """
 
-# CSV scioperi con nomi colonna "canonici".
-STRIKES = """\
-data_inizio,data_fine,settore,rilevanza,regione,sindacati,categoria
-2026-06-10,2026-06-10,Trasporto pubblico locale,Locale,Piemonte,FILT-CGIL,TPL
-2026-07-01,2026-07-01,Trasporti,Nazionale,Tutto il territorio nazionale,USB,Generale
-2026-08-01,2026-08-01,Scuola,Locale,Lombardia,FLC,Istruzione
-"""
 
-# Variante "ostile": colonne rinominate + delimitatore ';' (test difensivo).
-STRIKES_RENAMED = """\
-Dal;Al;Comparto;Ambito;Provincia;Organizzazioni Sindacali;Tipologia
-2026-06-10;2026-06-10;Trasporto pubblico locale;Locale;Torino;CUB;TPL
-2026-09-01;2026-09-01;Sanità;Locale;Veneto;NurSind;Sanità
+def _strike_item(guid: int, start: str, sector: str, relevance: str, region: str, prov: str) -> str:
+    """Item nel formato reale del feed RSS MIT (titolo + descrizione 'Chiave: valore')."""
+    title = " - ".join(
+        [
+            f"Data inizio: {start}",
+            f"Settore: {sector}",
+            f"Rilevanza: {relevance}",
+            f"Regione: {region}",
+            f"Provincia: {prov}",
+        ]
+    )
+    description = "<br/>".join(
+        [
+            "modalità: 4 ORE: DALLE 9.00 ALLE 13.00 - SECONDA FASCIA",
+            f"Data fine: {start}",
+            f"Settore: {sector}",
+            f"Rilevanza: {relevance}",
+            f"Regione: {region}",
+            f"Provincia: {prov}",
+            "Sindacati: FILT-CGIL",
+            "Categoria interessata: PERSONALE SOC. DI PROVA",
+            "Data proclamazione: 01/05/2026",
+        ]
+    )
+    return f"""
+    <item>
+      <title>{title}</title>
+      <description><![CDATA[{description}]]></description>
+      <guid>http://scioperi.mit.gov.it/{guid}</guid>
+    </item>"""
+
+
+# Feed scioperi: Torino TPL + generale nazionale (rilevanti); aereo nazionale e
+# TPL Lombardia (esclusi).
+STRIKES_RSS = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Ministero delle Infrastrutture e dei Trasporti - Elenco Scioperi in Programma</title>
+{_strike_item(9001, "10/06/2026", "Trasporto pubblico locale", "Locale", "Piemonte", "Torino")}
+{_strike_item(9002, "01/07/2026", "Generale", "Nazionale", " Italia", "Tutte")}
+{_strike_item(9003, "15/06/2026", "Aereo", "Nazionale", " Italia", "Tutte")}
+{_strike_item(9004, "01/08/2026", "Trasporto pubblico locale", "Locale", "Lombardia", "Milano")}
+  </channel>
+</rss>
 """
 
 
@@ -174,8 +206,7 @@ def main() -> None:
     (FIX / "vehicle_positions.pb").write_bytes(_vehicle_positions())
     (FIX / "trip_updates.pb").write_bytes(_trip_updates())
     (FIX / "alerts.pb").write_bytes(_alerts())
-    (FIX / "scioperi.csv").write_text(STRIKES, encoding="utf-8")
-    (FIX / "scioperi_rinominato.csv").write_text(STRIKES_RENAMED, encoding="utf-8")
+    (FIX / "scioperi.xml").write_text(STRIKES_RSS, encoding="utf-8")
     print(f"Fixtures scritte in {FIX}")
 
 

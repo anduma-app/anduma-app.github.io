@@ -71,3 +71,17 @@ def test_alerts(client, monkeypatch):
     body10 = r10.json()
     assert len(body10["service_alerts"]) == 1
     assert body10["service_alerts"][0]["effect"] == "DETOUR"
+
+
+def test_alerts_keep_strikes_when_gtt_feed_down(client, monkeypatch):
+    from fastapi import HTTPException
+
+    monkeypatch.setattr("app.clock.today", lambda: dt.date(2026, 6, 6))
+
+    def down():
+        raise HTTPException(status_code=503)
+
+    monkeypatch.setattr(client.app.state.provider, "alerts_bytes", down)
+    body = client.get("/v1/alerts").json()
+    assert body["service_alerts_available"] is False
+    assert body["service_alerts"] == [] and len(body["strikes"]) == 2

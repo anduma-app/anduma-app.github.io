@@ -95,10 +95,10 @@ class ServiceAlert(BaseModel):
 
 
 class Strike(BaseModel):
-    """Riga del registro MIT, normalizzata in modo difensivo.
+    """Sciopero dal feed MIT, normalizzato in modo difensivo.
 
-    ``raw`` conserva l'intera riga originale: i nomi delle colonne del CSV
-    possono cambiare nel tempo, quindi non perdiamo informazione.
+    ``raw`` conserva tutti i campi originali (e il ``guid``): il formato del
+    feed può cambiare nel tempo, quindi non perdiamo informazione.
     """
 
     start_date: str | None = None
@@ -113,6 +113,8 @@ class Strike(BaseModel):
 
 class AlertsResponse(BaseModel):
     service_alerts: list[ServiceAlert] = Field(default_factory=list)
+    # False se il feed avvisi GTT non è raggiungibile: gli scioperi restano validi.
+    service_alerts_available: bool = True
     strikes: list[Strike] = Field(default_factory=list)
 
 

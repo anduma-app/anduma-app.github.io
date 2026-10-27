@@ -11,6 +11,7 @@ testabili da fixture; il fetch di rete con TTL sta in ``FeedFetcher``.
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import time
 
 import httpx
@@ -22,6 +23,8 @@ from .clock import ROME
 from .config import Settings, get_settings
 from .gtfs_static import GtfsStatic
 from .models import Arrival, ServiceAlert, Vehicle
+
+log = logging.getLogger(__name__)
 
 
 def parse_feed(data: bytes) -> gtfs_realtime_pb2.FeedMessage:
@@ -267,6 +270,10 @@ def service_alerts(
 
 
 # ------------------------------------------------------------------- TTL fetcher
+# Per quanto si può servire l'ultimo payload valido se la sorgente è giù.
+_STALE_TTL_S = 3600
+
+
 class FeedFetcher:
     """Scarica i feed RT con cache TTL condivisa (un fetch per finestra).
 
@@ -295,11 +302,18 @@ class FeedFetcher:
             resp = self._client.get(url, follow_redirects=True)
             resp.raise_for_status()
         except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+            # Sorgente giù (GTT a volte risponde 500): meglio dati di qualche
+            # minuto fa che nessun dato. Si ritenta al giro successivo.
+            stale = self._cache.get(f"rt:{key}:last")
+            if stale is not None:
+                log.warning("Feed RT %s non raggiungibile, uso l'ultimo valido: %s", key, exc)
+                return stale
             raise HTTPException(
                 status_code=503,
                 detail=f"Feed RT non raggiungibile: {exc}",
             ) from exc
         self._cache.set(f"rt:{key}", resp.content, ttl)
+        self._cache.set(f"rt:{key}:last", resp.content, _STALE_TTL_S)
         return resp.content
 
     def vehicle_positions(self) -> bytes:

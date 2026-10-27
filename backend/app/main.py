@@ -192,8 +192,12 @@ async def ws_line_vehicles(
     try:
         while True:
             # Letture potenzialmente bloccanti (cache/parse) fuori dall'event loop.
-            resp = await run_in_threadpool(_vehicles_response, provider, line)
-            await websocket.send_json(resp.model_dump())
+            try:
+                resp = await run_in_threadpool(_vehicles_response, provider, line)
+            except HTTPException:
+                pass  # feed momentaneamente giù: salta il giro, la connessione resta
+            else:
+                await websocket.send_json(resp.model_dump())
             await asyncio.sleep(interval)
     except WebSocketDisconnect:
         pass
@@ -207,11 +211,14 @@ def alerts(
     provider: DataProvider = Depends(get_provider),
 ) -> AlertsResponse:
     gtfs = provider.gtfs()
-    feed = realtime.parse_feed(provider.alerts_bytes())
-    service = realtime.service_alerts(feed, gtfs, line=line)
     strikes = scioperi.filter_upcoming(
-        scioperi.filter_for_torino(scioperi.parse_strikes_csv(provider.strikes_csv()))
+        scioperi.filter_for_torino(scioperi.parse_strikes_rss(provider.strikes_feed()))
     )
+    try:
+        feed = realtime.parse_feed(provider.alerts_bytes())
+    except HTTPException:
+        return AlertsResponse(service_alerts_available=False, strikes=strikes)
+    service = realtime.service_alerts(feed, gtfs, line=line)
     return AlertsResponse(service_alerts=service, strikes=strikes)
 
 

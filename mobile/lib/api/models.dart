@@ -278,13 +278,17 @@ class Subscription {
 
 class AlertsResponse {
   final List<ServiceAlert> serviceAlerts;
+  /// False se il feed avvisi GTT non è raggiungibile (gli scioperi restano validi).
+  final bool serviceAlertsAvailable;
   final List<Strike> strikes;
-  const AlertsResponse({this.serviceAlerts = const [], this.strikes = const []});
+  const AlertsResponse(
+      {this.serviceAlerts = const [], this.serviceAlertsAvailable = true, this.strikes = const []});
 
   factory AlertsResponse.fromJson(Map<String, dynamic> j) => AlertsResponse(
         serviceAlerts: ((j['service_alerts'] as List?) ?? const [])
             .map((e) => ServiceAlert.fromJson(e as Map<String, dynamic>))
             .toList(),
+        serviceAlertsAvailable: (j['service_alerts_available'] as bool?) ?? true,
         strikes: ((j['strikes'] as List?) ?? const [])
             .map((e) => Strike.fromJson(e as Map<String, dynamic>))
             .toList(),

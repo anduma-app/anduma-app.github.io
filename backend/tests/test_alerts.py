@@ -20,7 +20,7 @@ from app.alerts import (
 )
 from app.db import Base, Device, NotifiedEvent, Subscription
 from app.realtime import parse_feed
-from app.scioperi import filter_for_torino, parse_strikes_csv
+from app.scioperi import filter_for_torino, parse_strikes_rss
 
 # Stesso istante delle fixture: gli arrivi cadono a +120s / +240s.
 FUTURE_TS = 1893456000
@@ -98,10 +98,10 @@ def test_imminent_no_subscriptions(session_factory, gtfs, trip_updates_bytes):
 
 
 # --------------------------------------------------------------------- strike
-def test_strikes_enqueue_once(session_factory, strikes_csv):
+def test_strikes_enqueue_once(session_factory, strikes_feed):
     _device_with_sub(session_factory, kind="strike", line="10")
-    strikes = filter_for_torino(parse_strikes_csv(strikes_csv))
-    assert len(strikes) == 2  # Piemonte + nazionale (Lombardia/scuola escluso)
+    strikes = filter_for_torino(parse_strikes_rss(strikes_feed))
+    assert len(strikes) == 2  # Torino TPL + generale nazionale (aereo e Lombardia esclusi)
     dispatcher = InProcessDispatcher()
 
     with session_factory() as s:
@@ -115,8 +115,8 @@ def test_strikes_enqueue_once(session_factory, strikes_csv):
     assert len(dispatcher.pending) == 2
 
 
-def test_strike_key_stable_and_distinct(strikes_csv):
-    strikes = filter_for_torino(parse_strikes_csv(strikes_csv))
+def test_strike_key_stable_and_distinct(strikes_feed):
+    strikes = filter_for_torino(parse_strikes_rss(strikes_feed))
     keys = {strike_key(s) for s in strikes}
     assert len(keys) == 2  # i due scioperi hanno chiavi diverse
     # Stabile: stessa riga → stessa chiave.
@@ -168,7 +168,7 @@ def test_build_scheduler_has_alert_jobs(session_factory):
     assert not scheduler.running
 
 
-def test_strike_notified_once_per_device_with_many_subscriptions(session_factory, strikes_csv):
+def test_strike_notified_once_per_device_with_many_subscriptions(session_factory, strikes_feed):
     with session_factory() as s:
         dev = Device(platform="android", fcm_token="tok-multi")
         dev.subscriptions += [
@@ -177,7 +177,7 @@ def test_strike_notified_once_per_device_with_many_subscriptions(session_factory
         ]
         s.add(dev)
         s.commit()
-    strikes = filter_for_torino(parse_strikes_csv(strikes_csv))
+    strikes = filter_for_torino(parse_strikes_rss(strikes_feed))
     dispatcher = InProcessDispatcher()
     with session_factory() as s:
         assert evaluate_strikes(s, strikes, dispatcher, now=FUTURE_TS) == len(strikes)

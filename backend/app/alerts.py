@@ -36,7 +36,7 @@ from .db import NotifiedEvent, Subscription
 from .gtfs_static import GtfsStatic
 from .models import Strike
 from .realtime import alert_entities, arrivals_for_stop, parse_feed
-from .scioperi import filter_for_torino, filter_upcoming, parse_date, parse_strikes_csv
+from .scioperi import filter_for_torino, filter_upcoming, parse_date, parse_strikes_rss
 
 log = logging.getLogger(__name__)
 
@@ -187,8 +187,8 @@ def evaluate_imminent(
 
 # --------------------------------------------------------------------- strike
 def strike_key(strike: Strike) -> str:
-    """Identità stabile di uno sciopero (per la deduplica)."""
-    base = "|".join(
+    """Identità stabile di uno sciopero (per la deduplica): il guid MIT se c'è."""
+    base = strike.raw.get("guid") or "|".join(
         [
             strike.start_date or "",
             strike.end_date or "",
@@ -317,7 +317,7 @@ def run_imminent(provider, dispatcher: Dispatcher, session_factory: sessionmaker
 def run_strikes(provider, dispatcher: Dispatcher, session_factory: sessionmaker[Session]) -> int:
     """Job strike: legge il registro MIT dal provider e valuta (tollerante a errori)."""
     try:
-        strikes = filter_upcoming(filter_for_torino(parse_strikes_csv(provider.strikes_csv())))
+        strikes = filter_upcoming(filter_for_torino(parse_strikes_rss(provider.strikes_feed())))
     except Exception:
         log.warning("Job strike: registro scioperi non disponibile", exc_info=True)
         return 0

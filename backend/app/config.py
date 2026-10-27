@@ -31,11 +31,9 @@ class Settings(BaseSettings):
     rt_trip_updates_url: str = "https://percorsieorari.gtt.to.it/das_gtfsrt/trip_update.aspx"
     rt_alerts_url: str = "https://percorsieorari.gtt.to.it/das_gtfsrt/alerts.aspx"
 
-    # --- Scioperi (registro MIT) ---
-    strikes_csv_url: str = (
-        "https://dati.mit.gov.it/catalog/dataset/scioperi-dei-trasporti/resource/"
-        "6838feb1-1f3d-40dc-845f-d304088a92cd/download/scioperi.csv"
-    )
+    # --- Scioperi (MIT, Osservatorio sui Conflitti Sindacali) ---
+    # Feed RSS degli scioperi in programma. Il CSV su dati.mit.gov.it è fermo al 2020.
+    strikes_rss_url: str = "https://scioperi.mit.gov.it/mit2/public/scioperi/rss"
 
     # --- TTL cache (secondi) ---
     ttl_vehicle_positions: int = 12
@@ -82,11 +80,6 @@ class Settings(BaseSettings):
     ws_interval_s: float = 4.0
     # Tetto di connessioni WS simultanee (backpressure).
     ws_max_connections: int = 500
-
-    # --- Geografia scioperi rilevanti per Torino ---
-    strike_regions: tuple[str, ...] = ("piemonte", "torino")
-    # Settori/rilevanze considerati "nazionali" → sempre inclusi per il TPL.
-    strike_national_markers: tuple[str, ...] = ("nazionale", "generale")
 
 
 @lru_cache

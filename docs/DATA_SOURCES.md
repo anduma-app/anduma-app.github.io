@@ -7,11 +7,12 @@ Tutte le sorgenti, con formato, licenza e trappole note. Tenere gli URL in `back
 - Dataset: http://aperto.comune.torino.it/dataset/feed-gtfs-trasporti-gtt
 - Formato: ZIP di file `.txt` (CSV) secondo specifica GTFS.
 - Licenza: **CC BY 4.0** (attribuzione "Città di Torino / GTT").
-- File usati: `routes.txt`, `stops.txt`, `trips.txt` (e `shapes.txt` per disegnare i percorsi).
+- File usati: `routes.txt`, `stops.txt`, `trips.txt`, `calendar*.txt`, `stop_times.txt`, `shapes.txt`.
 - **Trappola**: il link diretto di *download* dello ZIP può cambiare. Se dà 404, riprenderlo dalla
   pagina del dataset (sezione "Dati e Risorse" → risorsa "Feed GTFS … statico"). Tenerlo in config.
-- `stop_times.txt` è grande: **non serve** per gli arrivi in tempo reale (si usano i trip update RT).
-  Caricarlo solo se in futuro servono gli orari programmati offline.
+- `stop_times.txt` (~110 MB) **serve**: GTT indica la fermata nei trip update con `stop_sequence`
+  e quasi sempre solo col `delay`. Si indicizzano in streaming le sole corse attive ieri e oggi
+  (`stop_sequence → stop_id, orario`), ~1,5 s per costruire l'indice.
 
 ### Mappatura linea → route_id (fondamentale)
 I feed RT identificano le corse con `route_id`/`trip_id` interni, non con l'etichetta "10".
@@ -35,24 +36,32 @@ server API puro, non un sito web). Dataset ufficiale su Open Data Torino:
 https://aperto.comune.torino.it/en/dataset/feed-gtfs-real-time-trasporti-gtt
 
 - Cache TTL consigliata: ~10–15 s per posizioni/trip update, ~60 s per gli alerts.
-- Arrivi alla fermata = scorrere i `TripUpdate`, filtrare gli `stop_time_update` con `stop_id` target,
-  prendere `arrival.time` (o `departure.time`), sottrarre `now`. Arricchire con `route_short_name`
-  (via `route_id`/`trip_id` → GTFS statico) e `trip_headsign`.
+- Arrivi alla fermata: per ogni `TripUpdate` si risolve `stop_sequence` → `stop_id` con l'indice
+  orari; l'orario è `arrival.time` se presente, altrimenti programmato + `delay`, con base
+  "mezzogiorno − 12 h" della `start_date` del trip (corretto anche nei giorni del cambio d'ora).
+- **Trappola**: GTT pubblica previsioni solo per le ~7 fermate successive di ogni corsa. Per le
+  fermate più avanti il ritardo dell'ultimo aggiornamento si propaga (regola GTFS-RT).
+- **Trappola**: il feed alerts a volte risponde 500. Il backend serve l'ultimo payload valido
+  (fino a 1 h) e `/v1/alerts` restituisce comunque gli scioperi (`service_alerts_available=false`).
 - Tutti i campi sono opzionali per spec: controllare sempre `HasField(...)` prima di leggere.
 
-## Scioperi (registro MIT)
+## Scioperi (MIT)
 
 - Osservatorio sui Conflitti Sindacali del MIT — fonte ufficiale, preavviso ≥ 10 giorni per legge.
-- Dataset open data (CSV): https://dati.mit.gov.it/catalog/dataset/scioperi-dei-trasporti
-  - CSV: …/resource/6838feb1-1f3d-40dc-845f-d304088a92cd/download/scioperi.csv
-- Feed RSS (più semplice da filtrare per testo):
+- **Feed usato**: RSS degli scioperi in programma, aggiornato ogni giorno:
   https://scioperi.mit.gov.it/mit2/public/scioperi/rss
+  - Ogni `<item>`: titolo `Data inizio: … - Settore: … - Rilevanza: … - Regione: … - Provincia: …`,
+    descrizione con righe `Chiave: valore` separate da `<br/>` (data fine, sindacati, categoria,
+    modalità), `guid` stabile (usato per la deduplica delle push).
+  - Date in formato `DD/MM/YYYY`.
+- **Trappola**: il CSV su dati.mit.gov.it (`…/scioperi-dei-trasporti/…/scioperi.csv`) è fermo
+  a settembre 2020. Non usarlo.
+- **Trappola**: chiavi e formato possono cambiare. Il parser riconosce le chiavi in modo
+  case-insensitive per prefisso ed è coperto da una fixture nel formato reale.
 - Consultazione umana: http://scioperi.mit.gov.it/mit2/public/scioperi
-- Campi utili: data inizio/fine, **settore** (filtrare "Trasporto pubblico locale" + "Generale"),
-  **rilevanza** (Locale/Nazionale), **regione/provincia** (Piemonte / Torino), sindacati, categoria.
-- **Trappola**: i nomi esatti delle colonne del CSV possono variare nel tempo. Scrivere il parser in
-  modo difensivo (match testuale case-insensitive) e coprirlo con una fixture del CSV reale.
-- Per Torino includere: scioperi con area Piemonte/Torino **e** scioperi nazionali/generali del TPL.
+- Rilevanza per GTT: settore Trasporto pubblico locale, Generale o Plurisettoriale, se di rilevanza
+  nazionale o in Piemonte/Torino; in Piemonte anche il Ferroviario (GTT gestisce la Torino-Ceres).
+  Aereo, marittimo, merci e TPL di altre regioni sono esclusi.
 
 ## Riepilogo licenze / crediti
 

@@ -58,12 +58,12 @@ def test_gtfs_failure_backs_off_and_keeps_snapshot(day):
 
 
 def test_strikes_failure_backs_off_and_keeps_last(day):
-    dl = Downloader("a,b\n1,2\n")
+    dl = Downloader("<rss/>")
     p = LiveProvider(
         Settings(ttl_strikes=0), gtfs_downloader=Downloader(ZIP), strikes_downloader=dl
     )
-    assert p.strikes_csv() == "a,b\n1,2\n"
+    assert p.strikes_feed() == "<rss/>"
     dl.result = OSError("rete giù")
-    assert p.strikes_csv() == "a,b\n1,2\n"
-    assert p.strikes_csv() == "a,b\n1,2\n"
+    assert p.strikes_feed() == "<rss/>"
+    assert p.strikes_feed() == "<rss/>"
     assert dl.calls == 2

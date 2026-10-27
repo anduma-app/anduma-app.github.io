@@ -1,15 +1,20 @@
-"""Registro scioperi MIT: parser difensivo del CSV + filtro per Torino.
+"""Scioperi dei trasporti (MIT): parser difensivo del feed RSS + filtro per GTT.
 
-I nomi esatti delle colonne possono variare nel tempo: il match è testuale e
-case-insensitive, su più alias per campo. Per Torino si includono gli scioperi
-con area Piemonte/Torino **e** quelli nazionali/generali del TPL.
+Il feed RSS dell'Osservatorio sui Conflitti Sindacali elenca gli scioperi in
+programma; ogni ``<item>`` porta i campi come righe ``Chiave: valore`` nella
+descrizione. Le chiavi si riconoscono in modo case-insensitive su più alias,
+perché il formato può cambiare nel tempo. (Il vecchio CSV su dati.mit.gov.it
+è fermo al 2020 e non va usato.)
+
+Per Torino si tengono gli scioperi del trasporto pubblico locale e quelli
+generali/plurisettoriali, se nazionali o in Piemonte/Torino; in Piemonte anche
+il ferroviario (GTT gestisce la ferrovia Torino-Ceres).
 """
 
 from __future__ import annotations
 
-import csv
 import datetime as dt
-import io
+import xml.etree.ElementTree as ET
 
 import httpx
 
@@ -17,92 +22,86 @@ from . import clock
 from .config import Settings, get_settings
 from .models import Strike
 
-# Alias (lowercase, match per sottostringa) per ciascun campo logico.
+# Alias (lowercase, match per prefisso) delle chiavi nel testo di ogni item.
 _FIELD_ALIASES: dict[str, tuple[str, ...]] = {
-    "start_date": ("data_inizio", "data inizio", "dal", "inizio", "data_sciopero", "data"),
-    "end_date": ("data_fine", "data fine", "al", "fine", "termine"),
-    "sector": ("settore", "comparto"),
-    "relevance": ("rilevanza", "ambito"),
-    "area": ("regione", "provincia", "area", "territorio", "localizzazione", "luogo"),
-    "unions": ("sindacati", "sindacato", "organizzazioni", "oo.ss", "oss"),
-    "category": ("categoria", "tipologia", "motivazione"),
+    "start_date": ("data inizio",),
+    "end_date": ("data fine",),
+    "sector": ("settore",),
+    "relevance": ("rilevanza",),
+    "region": ("regione",),
+    "province": ("provincia",),
+    "unions": ("sindacat",),
+    "category": ("categoria",),
 }
 
-
-def _build_column_map(fieldnames: list[str]) -> dict[str, str]:
-    """Mappa campo-logico → nome-colonna-reale, con match case-insensitive."""
-    mapping: dict[str, str] = {}
-    norm = {fn: (fn or "").strip().lower() for fn in fieldnames}
-    for field, aliases in _FIELD_ALIASES.items():
-        for fn, low in norm.items():
-            if any(alias in low for alias in aliases):
-                mapping[field] = fn
-                break
-    return mapping
+_LOCAL_PLACES = ("piemonte", "torino")
+_TPL_SECTORS = ("pubblico locale", "generale", "plurisettoriale")
 
 
-def parse_strikes_csv(text: str) -> list[Strike]:
-    """Parsa il CSV del registro MIT in modo difensivo (delimiter auto)."""
-    text = text.lstrip("﻿")
-    if not text.strip():
-        return []
+def _fields(text: str, sep: str = "<br/>") -> dict[str, str]:
+    """Coppie ``Chiave: valore`` separate da ``sep`` (`` - `` nel titolo)."""
+    out: dict[str, str] = {}
+    for part in text.replace("<br />", "<br/>").split(sep):
+        key, sep, value = part.partition(":")
+        if sep and key.strip():
+            out.setdefault(key.strip(), value.strip())
+    return out
+
+
+def _pick(fields: dict[str, str], field: str) -> str | None:
+    for key, value in fields.items():
+        low = key.lower()
+        if any(low.startswith(alias) for alias in _FIELD_ALIASES[field]):
+            return value or None
+    return None
+
+
+def parse_strikes_rss(text: str) -> list[Strike]:
+    """Parsa il feed RSS MIT; feed vuoto o malformato → lista vuota."""
     try:
-        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t")
-    except csv.Error:
-        dialect = csv.excel  # fallback: virgola
-    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
-    fieldnames = reader.fieldnames or []
-    colmap = _build_column_map(fieldnames)
-
+        root = ET.fromstring(text.lstrip("\ufeff").strip())
+    except ET.ParseError:
+        return []
     out: list[Strike] = []
-    for row in reader:
-        clean = {(k or "").strip(): (v or "").strip() for k, v in row.items() if k is not None}
+    for item in root.iter("item"):
+        fields = _fields(item.findtext("title") or "", sep=" - ")
+        fields.update(_fields(item.findtext("description") or ""))
+        guid = (item.findtext("guid") or "").strip()
+        if guid:
+            fields["guid"] = guid
+        region = _pick(fields, "region")
+        province = _pick(fields, "province")
+        specific = province and province.lower() not in ("tutte", "tutti")
         out.append(
             Strike(
-                start_date=_pick(clean, colmap, "start_date"),
-                end_date=_pick(clean, colmap, "end_date"),
-                sector=_pick(clean, colmap, "sector"),
-                relevance=_pick(clean, colmap, "relevance"),
-                area=_pick(clean, colmap, "area"),
-                unions=_pick(clean, colmap, "unions"),
-                category=_pick(clean, colmap, "category"),
-                raw=clean,
+                start_date=_pick(fields, "start_date"),
+                end_date=_pick(fields, "end_date"),
+                sector=_pick(fields, "sector"),
+                relevance=_pick(fields, "relevance"),
+                area=province if specific else region,
+                unions=_pick(fields, "unions"),
+                category=_pick(fields, "category"),
+                raw=fields,
             )
         )
     return out
 
 
-def _pick(row: dict[str, str], colmap: dict[str, str], field: str) -> str | None:
-    col = colmap.get(field)
-    if not col:
-        return None
-    val = (row.get(col) or "").strip()
-    return val or None
-
-
-def is_relevant_for_torino(strike: Strike, settings: Settings | None = None) -> bool:
-    """True se lo sciopero tocca Torino/Piemonte o è nazionale/generale."""
-    settings = settings or get_settings()
-    # Tutto il testo della riga, per essere robusti a colonne mancanti/rinominate.
-    blob = " ".join(
-        [
-            strike.area or "",
-            strike.relevance or "",
-            strike.sector or "",
-            strike.category or "",
-            *strike.raw.values(),
-        ]
+def is_relevant_for_torino(strike: Strike) -> bool:
+    """True se lo sciopero può fermare il servizio GTT."""
+    sector = (strike.sector or "").lower()
+    relevance = (strike.relevance or "").lower()
+    place = " ".join(
+        [strike.area or "", strike.raw.get("Regione", ""), strike.raw.get("Provincia", "")]
     ).lower()
-    if any(region in blob for region in settings.strike_regions):
-        return True
-    if any(marker in blob for marker in settings.strike_national_markers):
-        return True
-    return False
+    tpl_like = any(s in sector for s in _TPL_SECTORS)
+    if any(p in place for p in _LOCAL_PLACES):
+        return tpl_like or "ferroviario" in sector
+    return tpl_like and relevance == "nazionale"
 
 
-def filter_for_torino(strikes: list[Strike], settings: Settings | None = None) -> list[Strike]:
-    settings = settings or get_settings()
-    return [s for s in strikes if is_relevant_for_torino(s, settings)]
+def filter_for_torino(strikes: list[Strike]) -> list[Strike]:
+    return [s for s in strikes if is_relevant_for_torino(s)]
 
 
 _DATE_FORMATS = ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d", "%d-%m-%Y")
@@ -131,9 +130,9 @@ _HORIZON_DAYS = 400
 def is_active_strike(strike: Strike, today: dt.date | None = None) -> bool:
     """True se lo sciopero è in corso o imminente, entro una finestra plausibile.
 
-    Il registro MIT è onnicomprensivo (scioperi dal 2014) e contiene refusi sulle
-    date (es. fine ``2107`` per ``2017``). Affidarsi alla sola *fine* lascia
-    passare questi casi. Qui uno sciopero è rilevante se **inizio o fine** cadono
+    Il feed elenca gli scioperi in programma, ma i dati MIT hanno storicamente
+    refusi sulle date (es. fine ``2107`` per ``2017``). Affidarsi alla sola *fine*
+    lascia passare questi casi. Qui uno sciopero è rilevante se **inizio o fine** cadono
     nella finestra ``[oggi - grace, oggi + orizzonte]``: scarta sia il passato sia
     le date assurdamente future. Se nessuna data è parsabile, NON scartiamo
     (difensivo: meglio mostrarne uno in più che nascondere uno sciopero reale).
@@ -158,21 +157,25 @@ def filter_upcoming(strikes: list[Strike], today: dt.date | None = None) -> list
     return [s for s in strikes if is_active_strike(s, today)]
 
 
-def download_strikes_csv(settings: Settings | None = None) -> str:
-    """Scarica il CSV scioperi (rete). Isolato per testabilità."""
+def download_strikes_rss(settings: Settings | None = None) -> str:
+    """Scarica il feed RSS scioperi (rete). Isolato per testabilità."""
     settings = settings or get_settings()
-    resp = httpx.get(settings.strikes_csv_url, timeout=settings.http_timeout, follow_redirects=True)
+    resp = httpx.get(
+        settings.strikes_rss_url,
+        timeout=settings.http_timeout,
+        follow_redirects=True,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; TransitoTorino/1.0)"},
+    )
     resp.raise_for_status()
-    resp.encoding = resp.encoding or "utf-8"
     return resp.text
 
 
 __all__ = [
-    "parse_strikes_csv",
+    "parse_strikes_rss",
     "is_relevant_for_torino",
     "filter_for_torino",
     "is_active_strike",
     "parse_date",
     "filter_upcoming",
-    "download_strikes_csv",
+    "download_strikes_rss",
 ]
