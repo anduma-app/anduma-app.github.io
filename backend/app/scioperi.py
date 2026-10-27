@@ -7,8 +7,8 @@ perché il formato può cambiare nel tempo. (Il vecchio CSV su dati.mit.gov.it
 è fermo al 2020 e non va usato.)
 
 Per Torino si tengono gli scioperi del trasporto pubblico locale e quelli
-generali/plurisettoriali, se nazionali o in Piemonte/Torino; in Piemonte anche
-il ferroviario (GTT gestisce la ferrovia Torino-Ceres).
+generali/plurisettoriali, se nazionali su tutta Italia o in Piemonte/Torino; in
+Piemonte anche il ferroviario (GTT gestisce la ferrovia Torino-Ceres).
 """
 
 from __future__ import annotations
@@ -97,7 +97,10 @@ def is_relevant_for_torino(strike: Strike) -> bool:
     tpl_like = any(s in sector for s in _TPL_SECTORS)
     if any(p in place for p in _LOCAL_PLACES):
         return tpl_like or "ferroviario" in sector
-    return tpl_like and relevance == "nazionale"
+    # Nazionali solo se registrati su tutta Italia: il MIT associa a volte uno
+    # sciopero "nazionale" a un'altra regione (es. Toscana), che non riguarda GTT.
+    region = (strike.raw.get("Regione") or strike.area or "").strip().lower()
+    return tpl_like and relevance == "nazionale" and region in ("", "italia")
 
 
 def filter_for_torino(strikes: list[Strike]) -> list[Strike]:

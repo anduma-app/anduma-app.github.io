@@ -31,26 +31,35 @@ class _PulsingDotState extends State<PulsingDot> with SingleTickerProviderStateM
       decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
     );
     if (!widget.animate) return dot;
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, child) {
-        final t = _c.value;
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            Opacity(
-              opacity: (1 - t) * 0.5,
-              child: Container(
-                width: widget.size + widget.size * 2 * t,
-                height: widget.size + widget.size * 2 * t,
-                decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
-              ),
-            ),
-            child!,
-          ],
-        );
-      },
-      child: dot,
+    // L'alone (fino a 3× il pallino) deborda senza occupare spazio: altrimenti
+    // la riga che lo contiene cambierebbe dimensione a ogni fotogramma.
+    return SizedBox.square(
+      dimension: widget.size,
+      child: OverflowBox(
+        maxWidth: widget.size * 3,
+        maxHeight: widget.size * 3,
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, child) {
+            final t = _c.value;
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                Opacity(
+                  opacity: (1 - t) * 0.5,
+                  child: Container(
+                    width: widget.size + widget.size * 2 * t,
+                    height: widget.size + widget.size * 2 * t,
+                    decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+                  ),
+                ),
+                child!,
+              ],
+            );
+          },
+          child: dot,
+        ),
+      ),
     );
   }
 }

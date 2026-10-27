@@ -63,7 +63,7 @@ class ArrivalRow extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      PulsingDot(color: st.base, size: 6, animate: true),
+                      PulsingDot(color: st.base, size: 6, animate: false),
                       const SizedBox(width: 6),
                       Text(
                         arriving ? 'IN ARRIVO' : 'REAL-TIME',

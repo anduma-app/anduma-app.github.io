@@ -59,9 +59,11 @@ https://aperto.comune.torino.it/en/dataset/feed-gtfs-real-time-trasporti-gtt
 - **Trappola**: chiavi e formato possono cambiare. Il parser riconosce le chiavi in modo
   case-insensitive per prefisso ed è coperto da una fixture nel formato reale.
 - Consultazione umana: http://scioperi.mit.gov.it/mit2/public/scioperi
-- Rilevanza per GTT: settore Trasporto pubblico locale, Generale o Plurisettoriale, se di rilevanza
-  nazionale o in Piemonte/Torino; in Piemonte anche il Ferroviario (GTT gestisce la Torino-Ceres).
-  Aereo, marittimo, merci e TPL di altre regioni sono esclusi.
+- Rilevanza per GTT: settore Trasporto pubblico locale, Generale o Plurisettoriale, se nazionale con
+  regione "Italia" o in Piemonte/Torino; in Piemonte anche il Ferroviario (GTT gestisce la Torino-Ceres).
+  Esclusi aereo, marittimo, merci, scioperi di altre regioni e "nazionali" registrati su un'altra regione.
+- **Trappola**: il feed alerts GTT può restare in errore 500 per ore (pagina "Runtime Error" ASP.NET,
+  vista il 27/10/2026): è un guasto lato GTT, l'app lo segnala e mostra comunque gli scioperi.
 
 ## Riepilogo licenze / crediti
 

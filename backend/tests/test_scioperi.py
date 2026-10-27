@@ -74,6 +74,18 @@ def test_relevance_rules():
     assert is_relevant_for_torino(Strike(sector="Trasporto pubblico locale", area="Piemonte"))
     assert is_relevant_for_torino(Strike(sector="Ferroviario", area="Torino"))  # Torino-Ceres
     assert is_relevant_for_torino(Strike(sector="Plurisettoriale", relevance="Nazionale"))
+    assert is_relevant_for_torino(
+        Strike(sector="Generale", relevance="Nazionale", area="Italia", raw={"Regione": " Italia"})
+    )
+    # "Nazionale" ma registrato su un'altra regione: escluso.
+    assert not is_relevant_for_torino(
+        Strike(
+            sector="Plurisettoriale",
+            relevance="Nazionale",
+            area="Toscana",
+            raw={"Regione": "Toscana"},
+        )
+    )
     assert not is_relevant_for_torino(Strike(sector="Aereo", relevance="Nazionale"))
     assert not is_relevant_for_torino(Strike(sector="Ferroviario", relevance="Nazionale"))
     assert not is_relevant_for_torino(

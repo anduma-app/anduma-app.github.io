@@ -113,7 +113,7 @@ Scheduler APScheduler:
   `line`; se `eta_minutes <= threshold_min` e non già notificato per quel `trip_id`, accoda push.
   Deduplica per `(subscription_id, trip_id)` con TTL finché il mezzo non è passato.
 - **strike** (ogni ~1 h): per ogni sciopero rilevante per GTT (feed RSS MIT: TPL/generale/
-  plurisettoriale, nazionale o in Piemonte/Torino), notifica una volta ogni device con
+  plurisettoriale, nazionale su tutta Italia o in Piemonte/Torino), notifica una volta ogni device con
   sottoscrizioni `strike`. Da fare: reminder il giorno prima e il mattino stesso; avviso anche a
   chi ha solo preferiti.
 - **line_alert** (ogni ~5 min): per ogni avviso di servizio GTT sulle linee sottoscritte, una push
