@@ -134,6 +134,16 @@ class DeviceOut(BaseModel):
     created_at: dt.datetime
 
 
+class DeviceRegistered(DeviceOut):
+    secret: str = Field(
+        ..., description="Da inviare come header X-Device-Secret; cambia a ogni registrazione"
+    )
+
+
+class DeviceTokenUpdate(BaseModel):
+    token: str = Field(..., min_length=1, description="Nuovo token push FCM")
+
+
 class FavoriteCreate(BaseModel):
     type: Literal["stop", "line"]
     ref: str = Field(..., min_length=1, description="stop_id (es. '350') o linea (es. '10')")

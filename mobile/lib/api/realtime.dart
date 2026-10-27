@@ -1,4 +1,4 @@
-// Streaming posizioni mezzi via WebSocket (WS /ws/lines/{line}), con fallback.
+// Streaming posizioni mezzi via WebSocket (WS /v1/ws/lines/{line}), con fallback.
 import 'dart:async';
 import 'dart:convert';
 
@@ -38,7 +38,7 @@ class VehiclesStream {
 
   void _connectWs() {
     try {
-      final uri = Uri.parse('${ApiConfig.wsBase}/ws/lines/$line');
+      final uri = Uri.parse('${ApiConfig.wsBase}/v1/ws/lines/$line');
       _channel = WebSocketChannel.connect(uri);
       _sub = _channel!.stream.listen(
         (event) {

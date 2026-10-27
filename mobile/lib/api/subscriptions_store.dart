@@ -1,21 +1,27 @@
 // Store osservabile delle sottoscrizioni alert dell'utente (M7).
 // Sincronizzato col backend /me/subscriptions; richiede un device registrato
-// (ApiClient.deviceId valorizzato dal PushManager). Se il device non è pronto
-// le operazioni sono no-op silenziose: la UI mostra che le push non sono attive.
+// (credenziali ApiClient valorizzate dal PushManager). Al primo alert creato
+// chiede il permesso notifiche e registra il device; se non è possibile le
+// operazioni restituiscono false e la UI lo segnala.
 import 'package:flutter/foundation.dart';
 
 import 'api_client.dart';
 import 'models.dart';
+import 'push_manager.dart';
 
 class SubscriptionsStore extends ChangeNotifier {
-  SubscriptionsStore(this._api);
+  SubscriptionsStore(this._api, this._push);
   final ApiClient _api;
+  final PushManager _push;
 
   List<Subscription> _subs = const [];
   bool _loaded = false;
 
   List<Subscription> get all => List.unmodifiable(_subs);
-  bool get ready => _api.deviceId != null;
+  bool get ready => _api.hasDevice;
+
+  /// Le push sono possibili su questo device (Firebase configurato).
+  bool get pushAvailable => _push.available;
   bool get loaded => _loaded;
 
   /// Sottoscrizioni "imminent" attive per una fermata.
@@ -49,8 +55,16 @@ class SubscriptionsStore extends ChangeNotifier {
     }
   }
 
+  /// Device pronto, chiedendo il permesso notifiche se è la prima volta.
+  Future<bool> _ensureReady() async {
+    if (ready) return true;
+    if (!await _push.enable()) return false;
+    await load();
+    return ready;
+  }
+
   Future<bool> addImminent(String stopId, String line, int thresholdMin) async {
-    if (!ready) return false;
+    if (!await _ensureReady()) return false;
     try {
       final sub = await _api.addImminentAlert(
           stopId: stopId, line: line, thresholdMin: thresholdMin);
@@ -74,7 +88,7 @@ class SubscriptionsStore extends ChangeNotifier {
     required bool on,
     required Future<Subscription> Function() create,
   }) async {
-    if (!ready) return false;
+    if (!await _ensureReady()) return false;
     try {
       if (on) {
         _subs = [..._subs, await create()];

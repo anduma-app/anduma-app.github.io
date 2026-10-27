@@ -1,6 +1,7 @@
 // Client REST verso il backend Transito Torino.
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'config.dart';
@@ -21,18 +22,22 @@ class ApiClient {
   final http.Client _client;
   final String _base;
 
-  /// Identità device anonima (id numerico restituito da POST /me/devices).
-  /// Inviata come header `X-Device-Id` sulle chiamate `/me/*`.
+  /// Identità device anonima restituita da POST /v1/me/devices: id + segreto,
+  /// inviati come header `X-Device-Id` / `X-Device-Secret` sulle chiamate `/me/*`.
   int? deviceId;
+  String? deviceSecret;
+
+  bool get hasDevice => deviceId != null && deviceSecret != null;
 
   Map<String, String> _headers({bool json = false}) => {
         if (json) 'Content-Type': 'application/json',
-        if (deviceId != null) 'X-Device-Id': '$deviceId',
+        if (hasDevice) 'X-Device-Id': '$deviceId',
+        if (hasDevice) 'X-Device-Secret': deviceSecret!,
       };
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final q = (query ?? {})..removeWhere((_, v) => v == null);
-    return Uri.parse('$_base$path').replace(
+    return Uri.parse('$_base/v1$path').replace(
       queryParameters: q.isEmpty ? null : q.map((k, v) => MapEntry(k, '$v')),
     );
   }
@@ -115,13 +120,18 @@ class ApiClient {
 
   // --------------------------------------------------------------- /me (M7)
 
-  /// Registra (o aggiorna) il device col token FCM; ritorna l'id device.
-  Future<int> registerDevice({required String token, String platform = 'android'}) async {
+  /// Registra (o ri-registra) il device col token FCM e ne memorizza le credenziali.
+  Future<void> registerDevice({required String token}) async {
+    final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
     final data = await _send('POST', '/me/devices', {'platform': platform, 'token': token})
         as Map<String, dynamic>;
-    final id = (data['id'] as num).toInt();
-    deviceId = id;
-    return id;
+    deviceId = (data['id'] as num).toInt();
+    deviceSecret = data['secret'] as String;
+  }
+
+  /// Aggiorna il token FCM ruotato senza perdere preferiti e alert.
+  Future<void> updateDeviceToken(String token) async {
+    await _send('PUT', '/me/devices/token', {'token': token});
   }
 
   Future<List<Subscription>> subscriptions() async {

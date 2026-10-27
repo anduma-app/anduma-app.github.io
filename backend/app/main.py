@@ -10,7 +10,15 @@ import asyncio
 import time
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from starlette.concurrency import run_in_threadpool
 
 from . import realtime, scioperi
@@ -70,7 +78,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(me_router)
+# API versionata (SPEC §4); /health resta fuori per il monitoraggio.
+api = APIRouter(prefix="/v1")
 
 
 def get_provider() -> DataProvider:
@@ -99,12 +108,12 @@ def health(provider: DataProvider = Depends(get_provider)) -> Health:
     )
 
 
-@app.get("/lines", response_model=list[Line])
+@api.get("/lines", response_model=list[Line])
 def lines(provider: DataProvider = Depends(get_provider)) -> list[Line]:
     return provider.gtfs().lines()
 
 
-@app.get("/stops/search", response_model=list[Stop])
+@api.get("/stops/search", response_model=list[Stop])
 def stops_search(
     q: str = Query(..., min_length=1, description="Nome fermata o codice palina"),
     limit: int = Query(20, ge=1, le=100),
@@ -113,7 +122,7 @@ def stops_search(
     return provider.gtfs().search_stops(q, limit=limit)
 
 
-@app.get("/stops/{stop_id}/arrivals", response_model=ArrivalsResponse)
+@api.get("/stops/{stop_id}/arrivals", response_model=ArrivalsResponse)
 def stop_arrivals(
     stop_id: str,
     line: str | None = Query(None, description="Filtra per linea, es. '10'"),
@@ -140,7 +149,7 @@ def _vehicles_response(provider: DataProvider, line: str) -> VehiclesResponse:
     return VehiclesResponse(line=line, count=len(vehicles), vehicles=vehicles)
 
 
-@app.get("/lines/{line}/shape", response_model=LineShape)
+@api.get("/lines/{line}/shape", response_model=LineShape)
 def line_shape(
     line: str,
     provider: DataProvider = Depends(get_provider),
@@ -154,7 +163,7 @@ def line_shape(
     )
 
 
-@app.get("/lines/{line}/vehicles", response_model=VehiclesResponse)
+@api.get("/lines/{line}/vehicles", response_model=VehiclesResponse)
 def line_vehicles(
     line: str,
     provider: DataProvider = Depends(get_provider),
@@ -162,7 +171,7 @@ def line_vehicles(
     return _vehicles_response(provider, line)
 
 
-@app.websocket("/ws/lines/{line}")
+@api.websocket("/ws/lines/{line}")
 async def ws_line_vehicles(
     websocket: WebSocket,
     line: str,
@@ -171,7 +180,7 @@ async def ws_line_vehicles(
     """Spinge le posizioni della linea ogni ~3–5 s dalla cache RT condivisa.
 
     Fallback se il WS non è disponibile: polling REST di
-    ``GET /lines/{line}/vehicles`` (stesso schema del messaggio).
+    ``GET /v1/lines/{line}/vehicles`` (stesso schema del messaggio).
     """
     await websocket.accept()
     manager: ConnectionManager = websocket.app.state.ws_manager
@@ -192,7 +201,7 @@ async def ws_line_vehicles(
         manager.unregister(websocket)
 
 
-@app.get("/alerts", response_model=AlertsResponse)
+@api.get("/alerts", response_model=AlertsResponse)
 def alerts(
     line: str | None = Query(None, description="Filtra avvisi per linea"),
     provider: DataProvider = Depends(get_provider),
@@ -204,3 +213,7 @@ def alerts(
         scioperi.filter_for_torino(scioperi.parse_strikes_csv(provider.strikes_csv()))
     )
     return AlertsResponse(service_alerts=service, strikes=strikes)
+
+
+api.include_router(me_router)
+app.include_router(api)

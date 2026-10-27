@@ -1,20 +1,28 @@
 """Endpoint utente (v1): device anonimo, preferiti, sottoscrizioni.
 
-Identità MVP: il client registra un device via ``POST /me/devices`` e poi si
-identifica con l'header ``X-Device-Id`` nelle altre chiamate ``/me/*``. Nessun
+Identità MVP: il client registra un device via ``POST /v1/me/devices`` e riceve
+un segreto casuale; nelle altre chiamate ``/me/*`` si identifica con gli header
+``X-Device-Id`` + ``X-Device-Secret``. Nel DB c'è solo l'hash del segreto. Nessun
 account: l'autenticazione vera arriverà dopo (vedi SPEC §4).
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import secrets
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .db import Device, Favorite, Subscription, get_session
 from .models import (
     DeviceCreate,
     DeviceOut,
+    DeviceRegistered,
+    DeviceTokenUpdate,
     FavoriteCreate,
     FavoriteOut,
     SubscriptionCreate,
@@ -24,32 +32,74 @@ from .models import (
 router = APIRouter(prefix="/me", tags=["me"])
 
 
+def _hash_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
 def get_current_device(
     x_device_id: int | None = Header(None, alias="X-Device-Id"),
+    x_device_secret: str | None = Header(None, alias="X-Device-Secret"),
     session: Session = Depends(get_session),
 ) -> Device:
-    """Risolve il device dall'header ``X-Device-Id`` (401 se assente/ignoto)."""
-    if x_device_id is None:
-        raise HTTPException(status_code=401, detail="Header X-Device-Id mancante")
+    """Risolve il device dagli header ``X-Device-Id`` + ``X-Device-Secret`` (401 se non validi)."""
+    if x_device_id is None or not x_device_secret:
+        raise HTTPException(status_code=401, detail="Credenziali device mancanti")
     device = session.get(Device, x_device_id)
-    if device is None:
-        raise HTTPException(status_code=401, detail="Device non registrato")
+    if (
+        device is None
+        or device.secret_hash is None
+        or not hmac.compare_digest(device.secret_hash, _hash_secret(x_device_secret))
+    ):
+        raise HTTPException(status_code=401, detail="Device non autenticato")
     return device
 
 
 # --------------------------------------------------------------------- devices
-@router.post("/devices", response_model=DeviceOut, status_code=201)
-def register_device(body: DeviceCreate, session: Session = Depends(get_session)) -> DeviceOut:
-    """Registra (o aggiorna) un device anonimo. Idempotente sul token FCM."""
-    existing = session.scalar(select(Device).where(Device.fcm_token == body.token))
-    if existing is not None:
-        existing.platform = body.platform
-        session.commit()
-        return DeviceOut.model_validate(existing)
-    device = Device(platform=body.platform, fcm_token=body.token)
-    session.add(device)
-    session.commit()
+@router.post("/devices", response_model=DeviceRegistered, status_code=201)
+def register_device(
+    body: DeviceCreate, session: Session = Depends(get_session)
+) -> DeviceRegistered:
+    """Registra (o ri-registra) un device anonimo. Idempotente sul token FCM.
+
+    Ogni registrazione genera un nuovo segreto: solo chi possiede il token FCM
+    (cioè l'app installata) può ottenerlo.
+    """
+    secret = secrets.token_urlsafe(32)
+    for _attempt in range(2):
+        device = session.scalar(select(Device).where(Device.fcm_token == body.token))
+        if device is None:
+            device = Device(fcm_token=body.token)
+            session.add(device)
+        device.platform = body.platform
+        device.secret_hash = _hash_secret(secret)
+        try:
+            session.commit()
+            break
+        except IntegrityError:
+            # Registrazione concorrente con lo stesso token: riprova sull'esistente.
+            session.rollback()
+    else:
+        raise HTTPException(status_code=409, detail="Registrazione concorrente, riprovare")
     session.refresh(device)
+    return DeviceRegistered(**DeviceOut.model_validate(device).model_dump(), secret=secret)
+
+
+@router.put("/devices/token", response_model=DeviceOut)
+def update_device_token(
+    body: DeviceTokenUpdate,
+    device: Device = Depends(get_current_device),
+    session: Session = Depends(get_session),
+) -> DeviceOut:
+    """Aggiorna il token FCM ruotato, mantenendo preferiti e sottoscrizioni."""
+    other = session.scalar(
+        select(Device).where(Device.fcm_token == body.token, Device.id != device.id)
+    )
+    if other is not None:
+        # Il token appartiene a questa installazione: il vecchio record è orfano.
+        session.delete(other)
+        session.flush()
+    device.fcm_token = body.token
+    session.commit()
     return DeviceOut.model_validate(device)
 
 
@@ -119,15 +169,24 @@ def add_subscription(
     device: Device = Depends(get_current_device),
     session: Session = Depends(get_session),
 ) -> SubscriptionOut:
-    sub = Subscription(
-        device_id=device.id,
-        kind=body.kind,
-        stop_id=body.stop_id,
-        line=body.line,
-        threshold_min=body.threshold_min,
-        active=True,
+    # Idempotente su (device, kind, fermata, linea): aggiorna la soglia dell'esistente.
+    sub = session.scalar(
+        select(Subscription).where(
+            Subscription.device_id == device.id,
+            Subscription.kind == body.kind,
+            Subscription.stop_id.is_(None)
+            if body.stop_id is None
+            else Subscription.stop_id == body.stop_id,
+            Subscription.line.is_(None) if body.line is None else Subscription.line == body.line,
+        )
     )
-    session.add(sub)
+    if sub is None:
+        sub = Subscription(
+            device_id=device.id, kind=body.kind, stop_id=body.stop_id, line=body.line
+        )
+        session.add(sub)
+    sub.threshold_min = body.threshold_min
+    sub.active = True
     session.commit()
     session.refresh(sub)
     return SubscriptionOut.model_validate(sub)

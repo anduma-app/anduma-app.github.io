@@ -59,7 +59,7 @@ class _LineAlertSheet extends StatelessWidget {
       messenger.showSnackBar(SnackBar(
         content: Text(subs.ready
             ? 'Operazione non riuscita. Riprova.'
-            : 'Notifiche non ancora attive su questo dispositivo.'),
+            : 'Notifiche non attive: consenti le notifiche nelle impostazioni del telefono.'),
       ));
     }
   }
@@ -97,7 +97,7 @@ class _LineAlertSheet extends StatelessWidget {
                             fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.3, color: c.ink)),
                   ],
                 ),
-                if (!subs.ready) ...[
+                if (!subs.pushAvailable) ...[
                   const SizedBox(height: TTSpace.x4),
                   Container(
                     padding: const EdgeInsets.all(TTSpace.x4),
@@ -106,7 +106,7 @@ class _LineAlertSheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(TTRadius.md),
                       border: Border.all(color: c.border),
                     ),
-                    child: Text('Le notifiche non sono ancora attive su questo dispositivo.',
+                    child: Text('Le notifiche non sono disponibili su questo dispositivo.',
                         style: TextStyle(fontSize: 13, color: c.inkMuted, height: 1.4)),
                   ),
                 ],
@@ -191,9 +191,9 @@ class _StopAlertSheetState extends State<_StopAlertSheet> {
                     style: TextStyle(fontSize: 13, color: c.inkMuted),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
-                if (!widget.subs.ready) ...[
+                if (!widget.subs.pushAvailable) ...[
                   const SizedBox(height: TTSpace.x4),
-                  _notice(c, 'Le notifiche non sono ancora attive su questo dispositivo.'),
+                  _notice(c, 'Le notifiche non sono disponibili su questo dispositivo.'),
                 ] else ...[
                   const SizedBox(height: TTSpace.x5),
                   Text('CON QUANTO ANTICIPO',
@@ -290,9 +290,11 @@ class _StopAlertSheetState extends State<_StopAlertSheet> {
       ok = existing.isEmpty || await widget.subs.remove(existing.first.id);
     }
     if (!ok) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Operazione non riuscita. Riprova.')),
-      );
+      messenger.showSnackBar(SnackBar(
+        content: Text(widget.subs.ready
+            ? 'Operazione non riuscita. Riprova.'
+            : 'Notifiche non attive: consenti le notifiche nelle impostazioni del telefono.'),
+      ));
     }
   }
 }

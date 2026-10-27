@@ -25,8 +25,8 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   final _api = ApiClient();
   final _favs = FavoritesStore();
-  late final _subs = SubscriptionsStore(_api);
   late final _push = PushManager(_api);
+  late final _subs = SubscriptionsStore(_api, _push);
 
   // Richiesta di aprire una fermata specifica negli Arrivi (deep-link push).
   final _arriviStopRequest = ValueNotifier<String?>(null);
@@ -42,8 +42,9 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _initPush() async {
+    _push.registered.addListener(_subs.load); // registrazione anche in differita
     await _push.init();
-    await _subs.load(); // dopo la registrazione device (X-Device-Id pronto)
+    await _subs.load();
     _push.deepLink.addListener(_onDeepLink);
     _push.foreground.addListener(_onForegroundMessage);
     _onDeepLink(); // consuma un eventuale deep-link da app terminata
@@ -104,6 +105,7 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     _push.deepLink.removeListener(_onDeepLink);
     _push.foreground.removeListener(_onForegroundMessage);
+    _push.registered.removeListener(_subs.load);
     _arriviStopRequest.dispose();
     _push.dispose();
     _api.close();
