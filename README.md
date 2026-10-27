@@ -12,24 +12,15 @@ di una linea a una fermata e per gli **scioperi** che toccano Torino/Piemonte.
 
 ## Stato
 
-| Milestone | Descrizione | Stato |
-|-----------|-------------|:-----:|
-| **M0** | Fondamenta backend read-only (linee, fermate, arrivi, mezzi, avvisi) | ✅ |
-| **M1** | Infra & persistenza (Postgres, Redis, migrazioni Alembic) | ✅ |
-| **M2** | Utenti, preferiti, sottoscrizioni (`/me/*`, device anonimo) | ✅ |
-| **M3** | Motore alert + scheduler (APScheduler, dedup idempotente) | ✅ |
-| **M4** | Push FCM/APNs (Firebase Admin SDK, cleanup token) | ✅ * |
-| **M5** | WebSocket mappa (`WS /ws/lines/{line}`, cache RT condivisa) | ✅ |
-| **M6** | Client Flutter — Arrivi + Mappa (design "Notte" di Claude design) | 🔄 |
-| M7 | Client Flutter (alert) + rifinitura | ⬜ |
-| M8 | Distribuzione | ⬜ |
+| Fase | Descrizione | Stato |
+|------|-------------|:-----:|
+| M0–M5 | Backend: dati GTT/MIT, persistenza, preferiti, alert, push FCM, WebSocket | ✅ |
+| M6–M7 | Client Flutter: Arrivi, Mappa, Preferiti, Avvisi, alert push e deep-link | ✅ |
+| **H** | Consolidamento: correzioni dall'audit di ottobre 2026, preparazione al rilascio | 🔄 |
+| M8 | Distribuzione (Android prima, poi iOS) | ⬜ |
 
-La roadmap dettagliata è in [`docs/ROADMAP.md`](docs/ROADMAP.md).
-\* M4: codice e test (mock) completi; l'invio reale richiede una service account
-Firebase (config esterna) e un device token vero (dall'app, M7).
-🔄 M6 in corso: schermate **Arrivi** e **Mappa** implementate dal design di Claude
-design (palette "Notte", Manrope); Preferiti/Avvisi/Info da rifinire quando arrivano
-i design dedicati. Vedi [`docs/DESIGN_PROMPTS.md`](docs/DESIGN_PROMPTS.md).
+Esiti e rischi per fase in [`ROADMAP.md`](ROADMAP.md); lavoro aperto della fase corrente in
+[`TASKS.md`](TASKS.md).
 
 ## Architettura
 
@@ -44,8 +35,11 @@ Backend Python (FastAPI)  ── polling centralizzato + cache TTL ──┐
         │                                                       │
         ▼                                                       │
 Client Flutter (mappa, arrivi, preferiti) ──────────────────────┘
-  parla esclusivamente con la nostra API
+  parla esclusivamente con la nostra API (/v1)
 ```
+
+In produzione: container API + container **worker** (scheduler alert e push, una sola replica),
+PostgreSQL e Redis. Stessa immagine (`backend/Dockerfile`).
 
 **Vincolo chiave:** il polling dei feed lo fa **solo il backend**, con cache condivisa
 (rate limit + batteria). I feed RT sono **protobuf binari**, non JSON.
@@ -58,39 +52,39 @@ Client Flutter (mappa, arrivi, preferiti) ────────────�
 - **Scheduler**: APScheduler. **Push**: Firebase Cloud Messaging (APNs dietro FCM).
 - **Client**: Flutter, mappa con `flutter_map` + tile OpenStreetMap.
 
-## Avvio rapido (backend)
+## Avvio rapido
 
 ```bash
+# Backend (SQLite + cache in memoria, nessun servizio esterno)
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn app.main:app --reload     # docs interattive: http://127.0.0.1:8000/docs
-pytest                            # 25 test, nessuno tocca la rete
-ruff check . && ruff format .
+uv sync --extra dev                # oppure: python -m venv .venv && pip install -e ".[dev]"
+.venv/bin/uvicorn app.main:app --reload   # docs interattive: http://127.0.0.1:8000/docs
+.venv/bin/pytest                   # nessun test tocca la rete
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
+
+# Stack completo in container (Postgres, Redis, API, worker)
+docker compose -f infra/docker-compose.yml --profile app up -d --build
+
+# Mobile
+cd mobile
+flutter run --dart-define=TT_API_BASE=http://10.0.2.2:8000   # emulatore Android
 ```
 
-### Endpoint disponibili (M0)
-
-| Metodo | Path | Descrizione |
-|--------|------|-------------|
-| GET | `/health` | stato + GTFS caricato |
-| GET | `/lines` | elenco linee |
-| GET | `/stops/search?q=&limit=` | ricerca fermate per nome/codice palina |
-| GET | `/stops/{stop_id}/arrivals?line=` | arrivi in tempo reale |
-| GET | `/lines/{line}/vehicles` | posizioni live dei mezzi |
-| GET | `/alerts?line=` | avvisi GTT + scioperi MIT |
-
-Dettaglio del contratto API in [`docs/SPEC.md`](docs/SPEC.md).
+Endpoint e contratto API in [`SPEC.md`](SPEC.md); dettagli del backend in
+[`backend/README.md`](backend/README.md), del client in [`mobile/README.md`](mobile/README.md).
 
 ## Struttura del repo
 
 ```
 .
-├── CLAUDE.md            # contesto progetto per Claude Code
-├── docs/                # SPEC, DATA_SOURCES, ROADMAP
-├── backend/             # app FastAPI + test (vedi backend/README.md)
-├── mobile/              # progetto Flutter (da M6)
-└── infra/               # docker-compose, deploy (da M1)
+├── AGENTS.md            # istruzioni per gli agenti di sviluppo (CLAUDE.md vi rimanda)
+├── SPEC.md              # requisiti e contratto API
+├── ROADMAP.md           # fasi, esiti, rischi
+├── TASKS.md             # fase corrente e lavoro aperto
+├── docs/                # DATA_SOURCES, FIREBASE_SETUP, DESIGN_PROMPTS
+├── backend/             # FastAPI + worker + test (vedi backend/README.md)
+├── mobile/              # client Flutter (vedi mobile/README.md)
+└── infra/               # docker-compose
 ```
 
 ## Sviluppato con Claude Code
@@ -98,8 +92,8 @@ Dettaglio del contratto API in [`docs/SPEC.md`](docs/SPEC.md).
 Questo progetto è sviluppato con l'assistenza di **[Claude Code](https://claude.com/claude-code)**,
 la CLI agentica di Anthropic. Scaffolding del backend, parser dei feed, suite di test e
 documentazione sono stati prodotti iterativamente in coppia con l'agente, seguendo le
-milestone di [`docs/ROADMAP.md`](docs/ROADMAP.md) (un branch e una review per milestone).
-Il file [`CLAUDE.md`](CLAUDE.md) fornisce all'agente il contesto, lo stack e i vincoli
+milestone di [`ROADMAP.md`](ROADMAP.md) (un branch e una review per fase).
+Il file [`AGENTS.md`](AGENTS.md) fornisce all'agente il contesto, lo stack e i vincoli
 non negoziabili del progetto.
 
 ## Dati e licenze
@@ -109,8 +103,8 @@ non negoziabili del progetto.
 - **Mappa**: tile **OpenStreetMap** → *"© OpenStreetMap contributors"*.
 
 Tutte le sorgenti, con formati e trappole note, sono documentate in
-[`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md). I crediti compariranno in una schermata
-"Informazioni / Fonti dati" dell'app.
+[`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md). I crediti sono nella schermata
+"Informazioni" dell'app (icona ⓘ in alto). Font Manrope: SIL Open Font License 1.1.
 
 ## Licenza
 
