@@ -93,6 +93,10 @@ def arrivals_for_stop(
     GTT indica la fermata con ``stop_sequence`` (non ``stop_id``) e a volte solo
     col ``delay``: si risolve la sequenza in ``stop_id`` via l'indice orari del
     GTFS statico e si calcola l'ETA da orario assoluto o da programmato + delay.
+
+    GTT pubblica previsioni solo per le prossime fermate della corsa. Per le
+    fermate successive vale la regola GTFS-RT: il ritardo dell'ultimo
+    aggiornamento precedente si propaga lungo la corsa.
     """
     now_ts = int(now if now is not None else time.time())
     out: list[Arrival] = []
@@ -107,7 +111,11 @@ def arrivals_for_stop(
             continue
         bases = [_schedule_base_ts(d) for d in _service_dates(tu, gtfs, trip_id)]
 
+        times: list[int | None] = []
+        covered: set[int] = set()  # stop_sequence con un aggiornamento esplicito
         for stu in tu.stop_time_update:
+            if stu.HasField("stop_sequence"):
+                covered.add(stu.stop_sequence)
             # Stop diretto se presente, altrimenti risolto da stop_sequence.
             sid = stu.stop_id if (stu.HasField("stop_id") and stu.stop_id) else None
             sched_secs: int | None = None
@@ -115,14 +123,21 @@ def arrivals_for_stop(
                 resolved = gtfs.resolve_seq(trip_id, stu.stop_sequence)
                 if resolved is not None:
                     sid, sched_secs = resolved
-            if sid != stop_id:
+            if sid == stop_id:
+                times.append(_stop_time_ts(stu, bases, sched_secs, now_ts))
+
+        for seq, sched_secs in gtfs.sequences_for_stop(trip_id, stop_id):
+            if seq in covered or sched_secs is None:
                 continue
-            sched_ts = _stop_time_ts(stu, bases, sched_secs, now_ts)
-            if sched_ts is None:
-                continue
-            eta = sched_ts - now_ts
-            if eta < 0:
-                continue  # mezzo già passato
+            delay = _propagated_delay(tu, seq)
+            if delay is not None and bases:
+                candidates = [base + sched_secs + delay for base in bases]
+                times.append(min(candidates, key=lambda ts: abs(ts - now_ts)))
+
+        for ts in times:
+            if ts is None or ts < now_ts:
+                continue  # orario ignoto o mezzo già passato
+            eta = ts - now_ts
             out.append(
                 Arrival(
                     line=short,
@@ -130,11 +145,31 @@ def arrivals_for_stop(
                     trip_id=trip_id or None,
                     eta_seconds=eta,
                     eta_minutes=round(eta / 60),
-                    scheduled_ts=sched_ts,
+                    scheduled_ts=ts,
                 )
             )
     out.sort(key=lambda a: a.eta_seconds)
     return out
+
+
+def _propagated_delay(tu: gtfs_realtime_pb2.TripUpdate, seq: int) -> int | None:
+    """Ritardo dell'ultimo aggiornamento con ``stop_sequence`` precedente a ``seq``.
+
+    None se la fermata precede tutti gli aggiornamenti (mezzo già passato) o se
+    l'aggiornamento non porta un ``delay``.
+    """
+    prev = [
+        stu
+        for stu in tu.stop_time_update
+        if stu.HasField("stop_sequence") and stu.stop_sequence < seq
+    ]
+    if not prev:
+        return None
+    last = max(prev, key=lambda stu: stu.stop_sequence)
+    for event_name in ("departure", "arrival"):
+        if last.HasField(event_name) and getattr(last, event_name).HasField("delay"):
+            return getattr(last, event_name).delay
+    return None
 
 
 def _service_dates(

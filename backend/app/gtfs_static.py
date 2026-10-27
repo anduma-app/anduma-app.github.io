@@ -261,6 +261,13 @@ class GtfsStatic:
             return None
         return self.schedule.get(trip_id, {}).get(stop_sequence)
 
+    def sequences_for_stop(self, trip_id: str | None, stop_id: str) -> list[tuple[int, int | None]]:
+        """``(stop_sequence, arrival_secs)`` delle soste della corsa alla fermata."""
+        if not trip_id:
+            return []
+        stops = self.schedule.get(trip_id, {})
+        return [(seq, secs) for seq, (sid, secs) in stops.items() if sid == stop_id]
+
     # --------------------------------------------------------------- lookups
     def route_ids_for_line(self, short_name: str) -> list[str]:
         """``route_id`` (anche più d'uno) per una linea es. "10"."""

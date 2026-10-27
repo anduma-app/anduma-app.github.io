@@ -174,3 +174,24 @@ def test_arrivals_correct_on_dst_change_day():
     [a] = realtime.arrivals_for_stop(feed, gtfs, "350", now=now)
     assert a.scheduled_ts == _rome_ts(2026, 10, 25, 12, 0)
     assert a.eta_seconds == 600
+
+
+def test_arrivals_propagate_delay_to_later_stops():
+    """GTT aggiorna solo le prossime fermate: il ritardo si propaga alle successive."""
+    import datetime as dt
+
+    gtfs = GtfsStatic(
+        routes={"R10A": {"route_id": "R10A", "route_short_name": "10"}},
+        trips={"T1": {"trip_id": "T1", "route_id": "R10A"}},
+        schedule={
+            "T1": {5: ("100", 9 * 3600), 6: ("200", 9 * 3600 + 120), 9: ("350", 9 * 3600 + 600)}
+        },
+        schedule_date=dt.date(2030, 1, 2),
+    )
+    feed = _delay_only_feed("T1", 5, 180, start_date="20300102")  # 3 min di ritardo alla seq 5
+    now = _rome_ts(2030, 1, 2, 9, 0)
+    [a] = realtime.arrivals_for_stop(feed, gtfs, "350", now=now)
+    assert a.eta_seconds == 600 + 180
+    # Fermata già superata (prima del primo aggiornamento): nessun arrivo.
+    gtfs.schedule["T1"][1] = ("50", 8 * 3600)
+    assert realtime.arrivals_for_stop(feed, gtfs, "50", now=now) == []
