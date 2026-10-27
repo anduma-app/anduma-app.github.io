@@ -1,6 +1,7 @@
 // Transito Torino — client Flutter (M7: arrivi, mappa, preferiti, avvisi, push).
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'api/config.dart';
 import 'screens/home_shell.dart';
@@ -12,6 +13,10 @@ void main() {
     // Una release senza backend punterebbe al telefono stesso: meglio fallire subito.
     throw StateError('Build release senza --dart-define=TT_API_BASE=https://...');
   }
+  LicenseRegistry.addLicense(() async* {
+    final ofl = await rootBundle.loadString('assets/fonts/OFL.txt');
+    yield LicenseEntryWithLineBreaks(const ['Manrope'], ofl);
+  });
   runApp(const TransitoApp());
 }
 

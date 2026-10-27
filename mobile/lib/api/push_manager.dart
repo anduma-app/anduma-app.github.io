@@ -92,8 +92,8 @@ class PushManager {
     }
   }
 
-  /// Chiede il permesso notifiche (se serve) e registra il device.
-  /// Ritorna true se le push sono attive.
+  /// Chiede il permesso notifiche (dialogo solo se non ancora concesso) e
+  /// registra il device. Ritorna true se le push sono attive.
   Future<bool> enable() async {
     if (!available) return false;
     final settings = await FirebaseMessaging.instance.requestPermission();
@@ -139,7 +139,9 @@ class PushManager {
       if (_api.hasDevice) {
         await _api.updateDeviceToken(token);
       } else {
-        await _registerOnce();
+        // Senza permesso non si registra: lo farà [enable] al primo alert.
+        final settings = await FirebaseMessaging.instance.getNotificationSettings();
+        if (_granted(settings.authorizationStatus)) await _registerOnce();
       }
     } catch (e) {
       debugPrint('Aggiornamento token fallito: $e');

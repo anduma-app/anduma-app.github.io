@@ -55,7 +55,10 @@ class _LineAlertSheet extends StatelessWidget {
 
   Future<void> _set(BuildContext context, Future<bool> Function() op) async {
     final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     if (!await op()) {
+      // Lo SnackBar resterebbe nascosto dietro il foglio: prima lo si chiude.
+      navigator.pop();
       messenger.showSnackBar(SnackBar(
         content: Text(subs.ready
             ? 'Operazione non riuscita. Riprova.'
@@ -279,6 +282,7 @@ class _StopAlertSheetState extends State<_StopAlertSheet> {
 
   Future<void> _toggle(String line, bool on) async {
     final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     bool ok;
     if (on) {
       ok = await widget.subs.addImminent(widget.stopId, line, _threshold);
@@ -290,6 +294,8 @@ class _StopAlertSheetState extends State<_StopAlertSheet> {
       ok = existing.isEmpty || await widget.subs.remove(existing.first.id);
     }
     if (!ok) {
+      // Lo SnackBar resterebbe nascosto dietro il foglio: prima lo si chiude.
+      navigator.pop();
       messenger.showSnackBar(SnackBar(
         content: Text(widget.subs.ready
             ? 'Operazione non riuscita. Riprova.'

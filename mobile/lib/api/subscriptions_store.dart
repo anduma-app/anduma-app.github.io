@@ -55,11 +55,11 @@ class SubscriptionsStore extends ChangeNotifier {
     }
   }
 
-  /// Device pronto, chiedendo il permesso notifiche se è la prima volta.
+  /// Permesso notifiche concesso e device registrato. Il permesso si verifica a
+  /// ogni nuovo alert: l'utente può averlo revocato dalle impostazioni.
   Future<bool> _ensureReady() async {
-    if (ready) return true;
     if (!await _push.enable()) return false;
-    await load();
+    if (!_loaded) await load();
     return ready;
   }
 
@@ -88,7 +88,7 @@ class SubscriptionsStore extends ChangeNotifier {
     required bool on,
     required Future<Subscription> Function() create,
   }) async {
-    if (!await _ensureReady()) return false;
+    if (on ? !await _ensureReady() : !ready) return false;
     try {
       if (on) {
         _subs = [..._subs, await create()];

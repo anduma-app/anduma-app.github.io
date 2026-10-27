@@ -1,6 +1,5 @@
 // ThemeData light/dark con Manrope + estensione TTColors (palette "Notte").
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'tokens.dart';
 
@@ -9,8 +8,8 @@ class AppTheme {
   static ThemeData dark() => _build(Brightness.dark, TTColors.dark);
 
   static ThemeData _build(Brightness brightness, TTColors c) {
-    final base = ThemeData(brightness: brightness, useMaterial3: true);
-    final textTheme = GoogleFonts.manropeTextTheme(base.textTheme).apply(
+    final base = ThemeData(brightness: brightness, useMaterial3: true, fontFamily: 'Manrope');
+    final textTheme = base.textTheme.apply(
       bodyColor: c.ink,
       displayColor: c.ink,
     );
