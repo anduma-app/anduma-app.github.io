@@ -1,17 +1,26 @@
 // Schermata Avvisi: avvisi di servizio GTT + scioperi MIT.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../api/favorites_store.dart';
 import '../api/models.dart';
 import '../theme/tokens.dart';
+import '../widgets/info_button.dart';
 import '../widgets/line_pill.dart';
 import '../widgets/state_views.dart';
 
 class AvvisiScreen extends StatefulWidget {
-  const AvvisiScreen({super.key, required this.api, required this.favs});
+  const AvvisiScreen(
+      {super.key, required this.api, required this.favs, required this.active, this.openLine});
   final ApiClient api;
   final FavoritesStore favs;
+
+  /// True mentre la tab è visibile e l'app in primo piano.
+  final ValueListenable<bool> active;
+
+  /// Richiesta esterna (deep-link da push) di mostrare gli avvisi di una linea.
+  final ValueListenable<String?>? openLine;
 
   @override
   State<AvvisiScreen> createState() => _AvvisiScreenState();
@@ -24,9 +33,36 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
   bool _onlyMine = false;
   String? _lineFilter; // linea specifica scelta dall'elenco (precede "Le mie linee")
 
+  DateTime? _loadedAt;
+
   @override
   void initState() {
     super.initState();
+    widget.active.addListener(_onActiveChanged);
+    widget.openLine?.addListener(_onOpenLine);
+    _lineFilter = widget.openLine?.value;
+    _load();
+  }
+
+  @override
+  void dispose() {
+    widget.active.removeListener(_onActiveChanged);
+    widget.openLine?.removeListener(_onOpenLine);
+    super.dispose();
+  }
+
+  void _onActiveChanged() {
+    final stale = _loadedAt == null || DateTime.now().difference(_loadedAt!).inMinutes >= 1;
+    if (widget.active.value && stale) _load();
+  }
+
+  void _onOpenLine() {
+    final line = widget.openLine?.value;
+    if (line == null || !mounted) return;
+    setState(() {
+      _lineFilter = line;
+      _onlyMine = false;
+    });
     _load();
   }
 
@@ -37,7 +73,7 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
     });
     try {
       final res = await widget.api.alerts();
-      if (mounted) setState(() { _data = res; _loading = false; });
+      if (mounted) setState(() { _data = res; _loading = false; _loadedAt = DateTime.now(); });
     } catch (_) {
       if (mounted) setState(() { _failed = true; _loading = false; });
     }
@@ -75,9 +111,15 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
 
   Widget _title(TTColors c) => Padding(
         padding: const EdgeInsets.fromLTRB(TTSpace.x5, TTSpace.x2, TTSpace.x5, TTSpace.x3),
-        child: Text('Avvisi',
-            style: TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.ink)),
+        child: Row(
+          children: [
+            Text('Avvisi',
+                style: TextStyle(
+                    fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.ink)),
+            const Spacer(),
+            const InfoButton(),
+          ],
+        ),
       );
 
   Widget _filterRow(TTColors c, int favCount) {

@@ -1,11 +1,17 @@
 // Transito Torino — client Flutter (M7: arrivi, mappa, preferiti, avvisi, push).
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'api/config.dart';
 import 'screens/home_shell.dart';
 import 'theme/app_theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kReleaseMode && !ApiConfig.isConfigured) {
+    // Una release senza backend punterebbe al telefono stesso: meglio fallire subito.
+    throw StateError('Build release senza --dart-define=TT_API_BASE=https://...');
+  }
   runApp(const TransitoApp());
 }
 

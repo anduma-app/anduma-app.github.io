@@ -10,14 +10,19 @@ import '../api/models.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import '../widgets/arrival_row.dart';
+import '../widgets/info_button.dart';
 import '../widgets/line_pill.dart';
 import '../widgets/pulsing_dot.dart';
 import '../widgets/state_views.dart';
 
 class ArriviScreen extends StatefulWidget {
-  const ArriviScreen({super.key, required this.api, required this.favs, this.openStop});
+  const ArriviScreen(
+      {super.key, required this.api, required this.favs, required this.active, this.openStop});
   final ApiClient api;
   final FavoritesStore favs;
+
+  /// True mentre la tab è visibile e l'app in primo piano (refresh attivo).
+  final ValueListenable<bool> active;
 
   /// Richiesta esterna (deep-link da push) di aprire una fermata per id.
   final ValueListenable<String?>? openStop;
@@ -32,6 +37,7 @@ class _ArriviScreenState extends State<ArriviScreen> {
   Timer? _refresh;
 
   List<Stop> _results = const [];
+  int _searchSeq = 0; // scarta risposte di ricerche superate
   bool _searching = false;
   Stop? _stop;
   ArrivalsResponse? _arrivals;
@@ -43,6 +49,7 @@ class _ArriviScreenState extends State<ArriviScreen> {
   @override
   void initState() {
     super.initState();
+    widget.active.addListener(_onActiveChanged);
     widget.openStop?.addListener(_onOpenStopRequested);
     // Eventuale richiesta già presente all'avvio (deep-link da app terminata).
     if (widget.openStop?.value != null) {
@@ -57,8 +64,24 @@ class _ArriviScreenState extends State<ArriviScreen> {
     _selectStop(Stop(stopId: id, name: 'Fermata $id'));
   }
 
+  void _onActiveChanged() {
+    if (widget.active.value && _stop != null) {
+      _loadArrivals(silent: true);
+      _startRefresh();
+    } else {
+      _refresh?.cancel();
+    }
+  }
+
+  void _startRefresh() {
+    _refresh?.cancel();
+    if (!widget.active.value) return;
+    _refresh = Timer.periodic(const Duration(seconds: 15), (_) => _loadArrivals(silent: true));
+  }
+
   @override
   void dispose() {
+    widget.active.removeListener(_onActiveChanged);
     widget.openStop?.removeListener(_onOpenStopRequested);
     _debounce?.cancel();
     _refresh?.cancel();
@@ -72,19 +95,26 @@ class _ArriviScreenState extends State<ArriviScreen> {
   }
 
   Future<void> _runSearch(String q) async {
+    final seq = ++_searchSeq;
     if (q.trim().isEmpty) {
-      setState(() => _results = const []);
+      setState(() {
+        _results = const [];
+        _searching = false;
+      });
       return;
     }
     setState(() => _searching = true);
+    List<Stop> res;
     try {
-      final res = await widget.api.searchStops(q);
-      if (mounted) setState(() => _results = res);
+      res = await widget.api.searchStops(q);
     } catch (_) {
-      if (mounted) setState(() => _results = const []);
-    } finally {
-      if (mounted) setState(() => _searching = false);
+      res = const [];
     }
+    if (!mounted || seq != _searchSeq) return;
+    setState(() {
+      _results = res;
+      _searching = false;
+    });
   }
 
   void _selectStop(Stop stop) {
@@ -96,8 +126,7 @@ class _ArriviScreenState extends State<ArriviScreen> {
       FocusScope.of(context).unfocus();
     });
     _loadArrivals();
-    _refresh?.cancel();
-    _refresh = Timer.periodic(const Duration(seconds: 15), (_) => _loadArrivals(silent: true));
+    _startRefresh();
   }
 
   Future<void> _loadArrivals({bool silent = false}) async {
@@ -106,6 +135,7 @@ class _ArriviScreenState extends State<ArriviScreen> {
     if (!silent) setState(() => _loadingArrivals = true);
     try {
       final res = await widget.api.arrivals(stop.stopId);
+      if (_stop?.stopId != stop.stopId) return; // nel frattempo è cambiata fermata
       if (mounted) {
         setState(() {
           _arrivals = res;
@@ -118,9 +148,11 @@ class _ArriviScreenState extends State<ArriviScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted && _stop?.stopId == stop.stopId) setState(() => _error = '$e');
     } finally {
-      if (mounted && !silent) setState(() => _loadingArrivals = false);
+      if (mounted && !silent && _stop?.stopId == stop.stopId) {
+        setState(() => _loadingArrivals = false);
+      }
     }
   }
 
@@ -157,7 +189,9 @@ class _ArriviScreenState extends State<ArriviScreen> {
             Text('Arrivi',
                 style: TextStyle(
                     fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.ink)),
+            const Spacer(),
             if (_stop != null && _updatedAt != null) _liveBadge(c),
+            const InfoButton(),
           ],
         ),
       );

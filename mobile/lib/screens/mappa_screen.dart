@@ -1,4 +1,5 @@
 // Schermata Mappa: mezzi live di una linea su tile OSM, marker direzionali.
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -15,9 +16,14 @@ import '../widgets/vehicle_marker.dart';
 const _torino = LatLng(45.0703, 7.6869);
 
 class MappaScreen extends StatefulWidget {
-  const MappaScreen({super.key, required this.api, required this.favs, this.onOpenStop});
+  const MappaScreen(
+      {super.key, required this.api, required this.favs, required this.active, this.onOpenStop});
   final ApiClient api;
   final FavoritesStore favs;
+
+  /// True mentre la tab è visibile e l'app in primo piano: solo allora lo
+  /// stream dei mezzi resta aperto.
+  final ValueListenable<bool> active;
 
   /// Apre una fermata negli Arrivi (tap su una fermata della mappa).
   final void Function(String stopId)? onOpenStop;
@@ -40,7 +46,8 @@ class _MappaScreenState extends State<MappaScreen> {
   @override
   void initState() {
     super.initState();
-    _subscribe();
+    widget.active.addListener(_onActiveChanged);
+    if (widget.active.value) _subscribe();
     _loadLines();
     _loadShape();
   }
@@ -77,9 +84,17 @@ class _MappaScreenState extends State<MappaScreen> {
     } catch (_) {/* la selezione linea resta col default */}
   }
 
+  void _onActiveChanged() {
+    if (widget.active.value) {
+      _subscribe();
+    } else {
+      _stream?.dispose();
+      _stream = null;
+    }
+  }
+
   void _subscribe() {
     _stream?.dispose();
-    _data = null;
     _status = RealtimeStatus.connecting;
     final s = VehiclesStream(_line);
     _stream = s;
@@ -100,13 +115,15 @@ class _MappaScreenState extends State<MappaScreen> {
       _selectedVehicleId = null;
       _routePolys = const [];
       _routeStops = const [];
+      _data = null;
     });
-    _subscribe();
+    if (widget.active.value) _subscribe();
     _loadShape();
   }
 
   @override
   void dispose() {
+    widget.active.removeListener(_onActiveChanged);
     _stream?.dispose();
     super.dispose();
   }
@@ -117,7 +134,7 @@ class _MappaScreenState extends State<MappaScreen> {
   @override
   Widget build(BuildContext context) {
     final c = TTColors.of(context);
-    final stale = _status != RealtimeStatus.live;
+    final stale = _status == RealtimeStatus.paused;
     return Stack(
       children: [
         FlutterMap(

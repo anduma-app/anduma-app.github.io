@@ -1,6 +1,7 @@
 // Schermata Preferiti: fermate e linee salvate, arrivi inline auto-refresh.
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
@@ -10,14 +11,19 @@ import '../api/subscriptions_store.dart';
 import '../theme/tokens.dart';
 import '../widgets/alert_sheet.dart';
 import '../widgets/arrival_row.dart';
+import '../widgets/info_button.dart';
 import '../widgets/line_pill.dart';
 import '../widgets/state_views.dart';
 
 class PreferitiScreen extends StatefulWidget {
-  const PreferitiScreen({super.key, required this.api, required this.favs, required this.subs});
+  const PreferitiScreen(
+      {super.key, required this.api, required this.favs, required this.subs, required this.active});
   final ApiClient api;
   final FavoritesStore favs;
   final SubscriptionsStore subs;
+
+  /// True mentre la tab è visibile e l'app in primo piano (refresh attivo).
+  final ValueListenable<bool> active;
 
   @override
   State<PreferitiScreen> createState() => _PreferitiScreenState();
@@ -25,15 +31,28 @@ class PreferitiScreen extends StatefulWidget {
 
 class _PreferitiScreenState extends State<PreferitiScreen> {
   Timer? _refresh;
+  // Funzioni di ricarica delle card fermata montate (refresh periodico e pull).
+  final _loaders = <Future<void> Function()>{};
 
   @override
   void initState() {
     super.initState();
-    _refresh = Timer.periodic(const Duration(seconds: 30), (_) => setState(() {}));
+    widget.active.addListener(_onActiveChanged);
+    _onActiveChanged();
   }
+
+  void _onActiveChanged() {
+    _refresh?.cancel();
+    if (!widget.active.value) return;
+    _reloadAll(); // dati freschi tornando sulla tab
+    _refresh = Timer.periodic(const Duration(seconds: 30), (_) => _reloadAll());
+  }
+
+  Future<void> _reloadAll() => Future.wait([for (final load in _loaders) load()]);
 
   @override
   void dispose() {
+    widget.active.removeListener(_onActiveChanged);
     _refresh?.cancel();
     super.dispose();
   }
@@ -62,7 +81,7 @@ class _PreferitiScreenState extends State<PreferitiScreen> {
                             'Cerca una fermata o apri la mappa e tocca la stella per salvarla qui.',
                       )
                     : RefreshIndicator(
-                        onRefresh: () async => setState(() {}),
+                        onRefresh: _reloadAll,
                         child: ListView(
                           padding:
                               const EdgeInsets.fromLTRB(TTSpace.x4, 0, TTSpace.x4, TTSpace.x8),
@@ -71,7 +90,14 @@ class _PreferitiScreenState extends State<PreferitiScreen> {
                               _sectionLabel(c, 'FERMATE'),
                               const SizedBox(height: TTSpace.x2),
                               for (final f in stops)
-                                _StopCard(fav: f, api: widget.api, favs: widget.favs, subs: widget.subs),
+                                _StopCard(
+                                  key: ValueKey(f.ref),
+                                  fav: f,
+                                  api: widget.api,
+                                  favs: widget.favs,
+                                  subs: widget.subs,
+                                  loaders: _loaders,
+                                ),
                             ],
                             if (lines.isNotEmpty) ...[
                               SizedBox(height: stops.isNotEmpty ? TTSpace.x5 : 0),
@@ -92,10 +118,16 @@ class _PreferitiScreenState extends State<PreferitiScreen> {
 
   Widget _title(TTColors c) => Padding(
         padding: const EdgeInsets.fromLTRB(TTSpace.x5, TTSpace.x2, TTSpace.x5, TTSpace.x3),
-        child: Text(
-          'Preferiti',
-          style: TextStyle(
-              fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.ink),
+        child: Row(
+          children: [
+            Text(
+              'Preferiti',
+              style: TextStyle(
+                  fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.6, color: c.ink),
+            ),
+            const Spacer(),
+            const InfoButton(),
+          ],
         ),
       );
 
@@ -108,11 +140,19 @@ class _PreferitiScreenState extends State<PreferitiScreen> {
 
 // ---------------------------------------------------------------- card fermata
 class _StopCard extends StatefulWidget {
-  const _StopCard({required this.fav, required this.api, required this.favs, required this.subs});
+  const _StopCard({
+    super.key,
+    required this.fav,
+    required this.api,
+    required this.favs,
+    required this.subs,
+    required this.loaders,
+  });
   final LocalFavorite fav;
   final ApiClient api;
   final FavoritesStore favs;
   final SubscriptionsStore subs;
+  final Set<Future<void> Function()> loaders;
 
   @override
   State<_StopCard> createState() => _StopCardState();
@@ -126,7 +166,14 @@ class _StopCardState extends State<_StopCard> {
   @override
   void initState() {
     super.initState();
+    widget.loaders.add(_load);
     _load();
+  }
+
+  @override
+  void dispose() {
+    widget.loaders.remove(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
