@@ -54,6 +54,8 @@ Mobile
 - [ ] P2 Firebase: firebase_core 5 / firebase_messaging 17.
 - [ ] P2 Pulsante "posizione" che ricentra solo su Torino.
 - [ ] P2 Strike card: una sola data se inizio = fine (il dettaglio completo è in ROADMAP).
+- [ ] P2 Numero di palina (quello esposto alla fermata, es. 253) accanto al nome nelle card dei
+      Preferiti, per distinguere le fermate omonime.
 - [ ] P2 Fermata aperta da notifica: l'intestazione mostra lo `stop_id` (es. 1687) invece del
       numero di palina (253).
 - [ ] P2 Dead code segnalato dall'audit: `TransitLine.mode` duplicato, `cupertino_icons` inutilizzato,
