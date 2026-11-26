@@ -188,5 +188,24 @@ class ApiClient {
     });
   }
 
+  /// Notifica di prova al device corrente. Ritorna null se inviata, altrimenti
+  /// il motivo del fallimento (testo del server, in italiano).
+  Future<String?> testPush() async {
+    final http.Response res;
+    try {
+      res = await _client
+          .post(_uri('/me/test-push'), headers: _headers())
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      return 'Rete non raggiungibile';
+    }
+    if (res.statusCode < 400) return null;
+    try {
+      final detail = (jsonDecode(utf8.decode(res.bodyBytes)) as Map)['detail'];
+      if (detail is String) return detail;
+    } catch (_) {}
+    return 'Errore server (${res.statusCode})';
+  }
+
   void close() => _client.close();
 }

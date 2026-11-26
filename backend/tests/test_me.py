@@ -208,3 +208,39 @@ def test_feedback_saved_without_device(client):
 
 def test_feedback_rejects_empty_message(client):
     assert client.post("/v1/feedback", json={"message": "    "}).status_code == 422
+
+
+# ------------------------------------------------------------------ test push
+class _FakeSender:
+    def __init__(self, exc=None):
+        self.sent, self.exc = [], exc
+
+    def send(self, token, message):
+        if self.exc:
+            raise self.exc
+        self.sent.append((token, message.title))
+
+
+def test_test_push_sends_to_own_device(client, monkeypatch):
+    from app.push import PushService
+
+    sender = _FakeSender()
+    monkeypatch.setattr("app.me.build_push_service", lambda: PushService(sender))
+    h = _register(client, token="tok-test")
+    assert client.post("/v1/me/test-push", headers=h).json() == {"sent": True}
+    assert sender.sent == [("tok-test", "Notifica di prova")]
+
+
+def test_test_push_reports_errors(client, monkeypatch):
+    from app.push import InvalidTokenError, PushService
+
+    h = _register(client, token="tok-err")
+    monkeypatch.setattr("app.me.build_push_service", lambda: None)
+    assert client.post("/v1/me/test-push", headers=h).status_code == 503
+    bad = PushService(_FakeSender(InvalidTokenError("tok-err")))
+    monkeypatch.setattr("app.me.build_push_service", lambda: bad)
+    assert client.post("/v1/me/test-push", headers=h).status_code == 410
+    boom = PushService(_FakeSender(RuntimeError("quota")))
+    monkeypatch.setattr("app.me.build_push_service", lambda: boom)
+    r = client.post("/v1/me/test-push", headers=h)
+    assert r.status_code == 502 and "quota" in r.json()["detail"]
