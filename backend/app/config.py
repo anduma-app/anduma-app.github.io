@@ -99,6 +99,17 @@ class Settings(BaseSettings):
     # Tetto di connessioni WS simultanee (backpressure).
     ws_max_connections: int = 500
 
+    # --- Feedback → issue GitHub ---
+    # Senza token il feedback resta solo nel DB. Token fine-grained con permesso
+    # Issues in lettura e scrittura sul solo repo indicato (vedi docs/DEPLOY.md).
+    github_token: str = ""
+    github_repo: str = "emanueledri/anduma"
+    # Anti-spam: invii di feedback ammessi per indirizzo IP al minuto.
+    feedback_max_per_minute: int = 3
+    # Header con l'IP reale del client dietro un proxy fidato. Su Render c'è
+    # Cloudflare: "cf-connecting-ip" (non falsificabile). Vuoto → IP della connessione.
+    client_ip_header: str = ""
+
     # --- CORS (client web) ---
     # Origini ammesse, separate da virgola. Vuoto → nessun header CORS (solo app native).
     cors_origins: str = ""

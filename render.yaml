@@ -19,6 +19,10 @@ services:
         sync: false
       - key: TT_FCM_CREDENTIALS_JSON # contenuto di backend/secrets/firebase-admin.json
         sync: false
+      # Token GitHub fine-grained (Issues lettura/scrittura sul solo repo anduma).
+      # Facoltativo: senza, il feedback resta solo nel DB. Vedi docs/DEPLOY.md.
+      - key: TT_GITHUB_TOKEN
+        sync: false
       # Scheduler nel processo API: UNA sola istanza, niente scaling orizzontale.
       - key: TT_SCHEDULER_ENABLED
         value: "true"
@@ -29,4 +33,10 @@ services:
       # Web app su GitHub Pages (.github/workflows/web.yml).
       - key: TT_CORS_ORIGINS
         value: https://emanueledri.github.io
+      # Feedback → issue su questo repo.
+      - key: TT_GITHUB_REPO
+        value: emanueledri/anduma
+      # Davanti a Render c'è Cloudflare: IP reale del client per l'anti-spam del feedback.
+      - key: TT_CLIENT_IP_HEADER
+        value: cf-connecting-ip
       # Il keep-alive (TT_KEEPALIVE_URL) si attiva da solo leggendo RENDER_EXTERNAL_URL.

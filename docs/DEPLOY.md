@@ -76,6 +76,23 @@ pubblici), chiave VAPID dai "Certificati push web" di Cloud Messaging. Il browse
 come device `web`. Su iPhone funzionano solo con la web app aggiunta alla schermata Home
 (iOS 16.4+).
 
+### 6. Feedback come issue GitHub (opzionale)
+
+Ogni feedback inviato dall'app viene salvato nella tabella `feedback` di Supabase. Se su
+Render è impostato `TT_GITHUB_TOKEN`, dopo aver risposto all'app il backend apre anche una
+issue su `TT_GITHUB_REPO` con etichetta `feedback`: titolo con le prime parole, messaggio
+in un blocco di codice (niente @menzioni né formattazione dell'utente), piattaforma e data.
+L'email (`contact`) resta solo nel database perché il repo è pubblico. Se GitHub fallisce,
+il feedback resta salvato e l'errore compare solo nei log ("Issue GitHub per il feedback
+non creata"). Anti-spam: `TT_FEEDBACK_MAX_PER_MINUTE` invii al minuto per IP (default 3),
+con l'IP letto da `CF-Connecting-IP` (`TT_CLIENT_IP_HEADER`).
+
+Token: GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained
+tokens** → Generate new token. Repository access: **Only select repositories** → `anduma`.
+Repository permissions: **Issues: Read and write** (Metadata in sola lettura si aggiunge da
+solo). Su Render: servizio `transito-torino` → **Environment** → aggiungi `TT_GITHUB_TOKEN`
+→ **Save, rebuild, and deploy**. Alla scadenza del token va rigenerato e sostituito.
+
 ## Esercizio
 
 - Ogni push su `main` rideploya. Il DB è su Supabase, quindi dispositivi e preferiti restano.

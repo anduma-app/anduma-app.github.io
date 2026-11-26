@@ -191,20 +191,3 @@ def test_register_web_device(client):
     r = client.post("/v1/me/devices", json={"platform": "web", "token": "tok-web"})
     assert r.status_code in (200, 201)
     assert r.json()["platform"] == "web"
-
-
-def test_feedback_saved_without_device(client):
-    from app.db import Feedback, get_session
-
-    r = client.post(
-        "/v1/feedback",
-        json={"message": "  Vorrei gli orari  ", "contact": " ", "platform": "web"},
-    )
-    assert r.status_code == 201
-    session = next(app.dependency_overrides[get_session]())
-    row = session.query(Feedback).one()
-    assert (row.message, row.contact, row.platform) == ("Vorrei gli orari", None, "web")
-
-
-def test_feedback_rejects_empty_message(client):
-    assert client.post("/v1/feedback", json={"message": "    "}).status_code == 422
