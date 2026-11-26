@@ -9,13 +9,16 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Settings dell'applicazione, sovrascrivibili da env (prefisso ``TT_``)."""
 
-    model_config = SettingsConfigDict(env_prefix="TT_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="TT_", env_file=".env", extra="ignore", populate_by_name=True
+    )
 
     # --- GTFS statico (orari, fermate, percorsi) ---
     # Trappola nota: il link diretto di download dello ZIP può cambiare (404).
@@ -53,6 +56,18 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./transito.db"
     db_echo: bool = False
 
+    @field_validator("database_url")
+    @classmethod
+    def _use_psycopg_driver(cls, value: str) -> str:
+        """Accetta le stringhe dei provider (``postgres://``, ``postgresql://``) così come sono.
+
+        SQLAlchemy userebbe psycopg2 (non installato): si forza il driver psycopg 3.
+        """
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value.removeprefix(prefix)
+        return value
+
     # --- Cache ---
     # Vuoto → cache in-memory (sviluppo). In produzione: redis://host:6379/0
     redis_url: str = ""
@@ -72,6 +87,9 @@ class Settings(BaseSettings):
     # Abilitato solo quando c'è una service account key valida (config esterna).
     fcm_enabled: bool = False
     fcm_credentials_file: str = "secrets/firebase-admin.json"
+    # In alternativa al file: il contenuto JSON della service account (hosting senza disco).
+    # Se valorizzato ha la precedenza su ``fcm_credentials_file``.
+    fcm_credentials_json: str = ""
     # Intervallo con cui svuotare la coda del dispatcher e inviare le push.
     push_interval_s: int = 10
 
@@ -80,6 +98,14 @@ class Settings(BaseSettings):
     ws_interval_s: float = 4.0
     # Tetto di connessioni WS simultanee (backpressure).
     ws_max_connections: int = 500
+
+    # --- Keep-alive (hosting free che spegne il servizio senza traffico in ingresso) ---
+    # Se valorizzato, lo scheduler chiama ``<url>/health`` ogni ``keepalive_interval_s``.
+    # Su Render viene letto in automatico da RENDER_EXTERNAL_URL.
+    keepalive_url: str = Field(
+        default="", validation_alias=AliasChoices("TT_KEEPALIVE_URL", "RENDER_EXTERNAL_URL")
+    )
+    keepalive_interval_s: int = 600
 
 
 @lru_cache

@@ -11,6 +11,8 @@ import logging
 import signal
 import threading
 
+import httpx
+
 from .alerts import InProcessDispatcher, build_scheduler
 from .config import Settings, get_settings
 from .db import SessionLocal
@@ -43,9 +45,28 @@ def create_scheduler(provider: DataProvider, settings: Settings | None = None):
             if dropped:
                 log.info("FCM disabilitato: %d notifiche non inviate", len(dropped))
 
-    return build_scheduler(
+    scheduler = build_scheduler(
         provider, dispatcher, SessionLocal, settings, push_processor=push_processor
     )
+    if settings.keepalive_url:
+        scheduler.add_job(
+            _keepalive,
+            "interval",
+            seconds=settings.keepalive_interval_s,
+            args=[settings.keepalive_url.rstrip("/") + "/health"],
+            id="keepalive",
+            max_instances=1,
+            coalesce=True,
+        )
+    return scheduler
+
+
+def _keepalive(url: str) -> None:
+    """Richiesta dall'esterno verso sé stessi: evita lo spegnimento per inattività."""
+    try:
+        httpx.get(url, timeout=30)
+    except httpx.HTTPError as exc:
+        log.warning("Keep-alive fallito: %s", exc)
 
 
 def main() -> None:

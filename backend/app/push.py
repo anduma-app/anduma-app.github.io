@@ -12,6 +12,7 @@ Firebase, configurazione esterna).
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -48,8 +49,9 @@ class PushResult:
 class FirebaseSender:
     """Sender reale: Firebase Admin SDK. Inizializzazione pigra e idempotente."""
 
-    def __init__(self, credentials_file: str, app_name: str = "transito"):
-        self._credentials_file = credentials_file
+    def __init__(self, credentials: str | dict, app_name: str = "transito"):
+        # Path del file JSON oppure il suo contenuto già decodificato.
+        self._credentials = credentials
         self._app_name = app_name
         self._app = None
 
@@ -59,7 +61,7 @@ class FirebaseSender:
         import firebase_admin
         from firebase_admin import credentials
 
-        cred = credentials.Certificate(self._credentials_file)
+        cred = credentials.Certificate(self._credentials)
         try:
             self._app = firebase_admin.get_app(self._app_name)
         except ValueError:
@@ -144,7 +146,11 @@ def build_push_service(settings: Settings | None = None) -> PushService | None:
     settings = settings or get_settings()
     if not settings.fcm_enabled:
         return None
-    return PushService(FirebaseSender(settings.fcm_credentials_file))
+    if settings.fcm_credentials_json:
+        creds: str | dict = json.loads(settings.fcm_credentials_json)
+    else:
+        creds = settings.fcm_credentials_file
+    return PushService(FirebaseSender(creds))
 
 
 def make_push_processor(

@@ -117,3 +117,11 @@ def test_push_processor_tick(session_factory):
     result = tick()
     assert result.sent == 1
     assert dispatcher.pending == []
+
+
+def test_build_push_service_accepts_inline_json_credentials():
+    from app.config import Settings
+    from app.push import build_push_service
+
+    svc = build_push_service(Settings(fcm_enabled=True, fcm_credentials_json='{"type": "x"}'))
+    assert svc._sender._credentials == {"type": "x"}

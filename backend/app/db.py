@@ -111,7 +111,13 @@ def make_engine(settings: Settings | None = None):
     if settings.database_url.startswith("sqlite"):
         # SQLite + thread di FastAPI/scheduler.
         connect_args["check_same_thread"] = False
-    return create_engine(settings.database_url, echo=settings.db_echo, connect_args=connect_args)
+    # pool_pre_ping: i pooler gestiti (es. Supabase) chiudono le connessioni inattive.
+    return create_engine(
+        settings.database_url,
+        echo=settings.db_echo,
+        connect_args=connect_args,
+        pool_pre_ping=True,
+    )
 
 
 # Engine/sessionmaker di default del processo (override-abili nei test).
