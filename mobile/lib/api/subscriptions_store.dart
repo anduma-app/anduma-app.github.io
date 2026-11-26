@@ -117,4 +117,20 @@ class SubscriptionsStore extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Disattiva tutte le notifiche. Ritorna quante non è stato possibile rimuovere.
+  Future<int> removeAll() async {
+    if (!ready) return _subs.length;
+    var failed = 0;
+    for (final sub in [..._subs]) {
+      try {
+        await _api.deleteSubscription(sub.id);
+        _subs = _subs.where((s) => s.id != sub.id).toList();
+      } catch (_) {
+        failed++;
+      }
+    }
+    notifyListeners();
+    return failed;
+  }
 }

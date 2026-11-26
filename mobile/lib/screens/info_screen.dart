@@ -70,7 +70,8 @@ class InfoScreen extends StatelessWidget {
               'Salva fermate e linee con la stella per ritrovarle subito.'),
           credit(Icons.notifications_none, 'Notifiche',
               'Tocca la campanella su una fermata per essere avvisato quando la tua linea sta '
-                  'arrivando, oppure su una linea preferita per scioperi e deviazioni.'),
+                  'arrivando, oppure su una linea preferita per scioperi e deviazioni. Per '
+                  'spegnerle tutte: Preferiti → Disattiva tutte.'),
           credit(Icons.campaign_outlined, 'Avvisi',
               'Deviazioni e scioperi in corso, filtrabili per linee preferite, solo scioperi '
                   'o singola linea.'),
