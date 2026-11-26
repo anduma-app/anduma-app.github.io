@@ -1,4 +1,4 @@
-// Design tokens — Transito Torino (palette "Notte", da Claude design).
+// Design tokens — Anduma (palette "Notte", da Claude design).
 // Colori, scala semantica e atomi condivisi. Vedi docs/DESIGN_PROMPTS.md.
 import 'package:flutter/material.dart';
 

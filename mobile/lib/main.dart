@@ -1,4 +1,4 @@
-// Transito Torino — client Flutter (M7: arrivi, mappa, preferiti, avvisi, push).
+// Anduma — client Flutter (M7: arrivi, mappa, preferiti, avvisi, push).
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -26,7 +26,7 @@ class TransitoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Transito Torino',
+      title: 'Anduma',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

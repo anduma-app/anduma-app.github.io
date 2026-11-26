@@ -1,4 +1,4 @@
-// Client REST verso il backend Transito Torino.
+// Client REST verso il backend di Anduma.
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

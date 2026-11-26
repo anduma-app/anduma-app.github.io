@@ -167,7 +167,7 @@ def download_strikes_rss(settings: Settings | None = None) -> str:
         settings.strikes_rss_url,
         timeout=settings.http_timeout,
         follow_redirects=True,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; TransitoTorino/1.0)"},
+        headers={"User-Agent": "Mozilla/5.0 (compatible; Anduma/1.0)"},
     )
     resp.raise_for_status()
     return resp.text

@@ -53,10 +53,10 @@ class InfoScreen extends StatelessWidget {
           _appHeader(c),
           const SizedBox(height: TTSpace.x5),
           Text(
-            'Transito Torino ti dice quando passa il prossimo bus, tram o metro a Torino. '
-            'Usa i dati aperti ufficiali della Città di Torino e di GTT, che il nostro server '
-            'aggiorna in continuazione. I tempi di arrivo sono stime GTT e possono '
-            'differire da quelli reali.',
+            'Anduma, in piemontese «andiamo»: ti dice quando passa il prossimo bus, tram o '
+            'metro a Torino, così sai quando è ora di andare. Usa i dati aperti ufficiali della '
+            'Città di Torino e di GTT, che il nostro server aggiorna in continuazione. I tempi '
+            'di arrivo sono stime GTT e possono differire da quelli reali.',
             style: TextStyle(fontSize: 14, color: c.ink, height: 1.5),
           ),
           const SizedBox(height: TTSpace.x6),
@@ -117,11 +117,11 @@ class InfoScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Transito Torino',
+                Text('Anduma',
                     style: TextStyle(
                         fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: c.ink)),
                 const SizedBox(height: 2),
-                Text('Arrivi, mezzi live e avvisi GTT · v0.1 (MVP)',
+                Text('Sai quando passa, sai quando andare · v0.1',
                     style: TextStyle(fontSize: 13, color: c.inkMuted)),
               ],
             ),

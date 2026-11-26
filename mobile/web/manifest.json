@@ -1,11 +1,11 @@
 {
-    "name": "Transito Torino",
-    "short_name": "Transito",
+    "name": "Anduma",
+    "short_name": "Anduma",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0B1220",
     "theme_color": "#2C3E66",
-    "description": "Arrivi e mezzi GTT in tempo reale.",
+    "description": "Anduma: arrivi e mezzi GTT a Torino in tempo reale.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

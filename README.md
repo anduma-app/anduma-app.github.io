@@ -1,6 +1,6 @@
-# Transito Torino
+# Anduma
 
-> Nome di lavoro provvisorio.
+> *Anduma*, in piemontese «andiamo»: sai quando passa, sai quando andare.
 
 App mobile per il trasporto pubblico di Torino (GTT): **arrivi in fermata in tempo
 reale**, **posizione live** di bus e tram sul percorso, **preferiti** e **notifiche

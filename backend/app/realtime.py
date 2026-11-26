@@ -290,7 +290,7 @@ class FeedFetcher:
         self._settings = settings or get_settings()
         self._client = client or httpx.Client(
             timeout=self._settings.http_timeout,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; TransitoTorino/1.0)"},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; Anduma/1.0)"},
         )
         self._cache: Cache = cache or InMemoryCache()
 

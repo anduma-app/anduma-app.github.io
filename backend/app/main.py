@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Transito Torino — backend",
+    title="Anduma — backend",
     version="0.0.1",
     summary="Arrivi, mezzi live e avvisi del trasporto pubblico GTT di Torino.",
     description=ATTRIBUTION,

@@ -1,1 +1,1 @@
-"""Backend Transito Torino — package applicativo."""
+"""Backend Anduma — package applicativo."""
