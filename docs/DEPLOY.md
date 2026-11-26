@@ -60,6 +60,17 @@ cd mobile
 flutter build appbundle --dart-define=TT_API_BASE=https://transito-torino.onrender.com
 ```
 
+### 5. Web app (opzionale, comoda per provare senza APK)
+
+Il workflow [`.github/workflows/web.yml`](../.github/workflows/web.yml) compila il client
+Flutter per il web e lo pubblica su GitHub Pages a ogni push su `main` che tocca `mobile/`:
+<https://emanueledri.github.io/anduma/>. Il backend ammette quell'origine con
+`TT_CORS_ORIGINS` (impostata in `render.yaml`).
+
+Differenze rispetto all'app nativa: niente notifiche push (Firebase non è configurato per il
+web) e preferiti salvati nel browser. Da smartphone: apri il link e usa "Aggiungi a schermata
+Home".
+
 ## Esercizio
 
 - Ogni push su `main` rideploya. Il DB è su Supabase, quindi dispositivi e preferiti restano.

@@ -26,4 +26,7 @@ services:
         value: "true"
       - key: PORT
         value: "8000"
+      # Web app su GitHub Pages (.github/workflows/web.yml).
+      - key: TT_CORS_ORIGINS
+        value: https://emanueledri.github.io
       # Il keep-alive (TT_KEEPALIVE_URL) si attiva da solo leggendo RENDER_EXTERNAL_URL.
