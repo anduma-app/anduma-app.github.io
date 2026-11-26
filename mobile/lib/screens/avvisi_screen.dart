@@ -30,8 +30,8 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
   AlertsResponse? _data;
   bool _loading = true;
   bool _failed = false;
-  bool _onlyMine = false;
-  String? _lineFilter; // linea specifica scelta dall'elenco (precede "Le mie linee")
+  _Filter _filter = _Filter.all;
+  String? _lineFilter; // linea specifica scelta dall'elenco (precede gli altri filtri)
 
   DateTime? _loadedAt;
 
@@ -61,7 +61,7 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
     if (line == null || !mounted) return;
     setState(() {
       _lineFilter = line;
-      _onlyMine = false;
+      _filter = _Filter.all;
     });
     _load();
   }
@@ -76,6 +76,20 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
       if (mounted) setState(() { _data = res; _loading = false; _loadedAt = DateTime.now(); });
     } catch (_) {
       if (mounted) setState(() { _failed = true; _loading = false; });
+    }
+    _fillMissingStopLines();
+  }
+
+  /// Fermate salvate prima che se ne memorizzassero le linee: le si recupera
+  /// dal backend, così il filtro "Preferite" le include.
+  Future<void> _fillMissingStopLines() async {
+    for (final f in widget.favs.stops.where((f) => f.lines.isEmpty)) {
+      try {
+        final res = await widget.api.arrivals(f.ref);
+        await widget.favs.updateStopLines(f.ref, res.lines);
+      } catch (_) {
+        // riprova al prossimo caricamento
+      }
     }
   }
 
@@ -94,13 +108,12 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
       child: ListenableBuilder(
         listenable: widget.favs,
         builder: (context, _) {
-          final myLines = widget.favs.lines.map((f) => f.ref).toSet();
-          if (myLines.isEmpty && _onlyMine) _onlyMine = false;
+          final myLines = widget.favs.allLines;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _title(c),
-              _filterRow(c, myLines.length),
+              _filterRow(c),
               Expanded(child: _content(c, myLines)),
             ],
           );
@@ -122,7 +135,12 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
         ),
       );
 
-  Widget _filterRow(TTColors c, int favCount) {
+  Widget _filterChip(TTColors c, String label, _Filter f) => _chip(c,
+      label: label,
+      active: _filter == f && _lineFilter == null,
+      onTap: () => setState(() { _filter = f; _lineFilter = null; }));
+
+  Widget _filterRow(TTColors c) {
     final byLine = _lineFilter != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(TTSpace.x4, 0, TTSpace.x4, TTSpace.x3),
@@ -131,18 +149,12 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
         child: ListView(
           scrollDirection: Axis.horizontal,
           children: [
-            _chip(c,
-                label: 'Tutti',
-                active: !_onlyMine && !byLine,
-                onTap: () => setState(() { _onlyMine = false; _lineFilter = null; })),
+            _filterChip(c, 'Tutti', _Filter.all),
             const SizedBox(width: 8),
-            if (favCount > 0) ...[
-              _chip(c,
-                  label: 'Le mie linee · $favCount',
-                  active: _onlyMine && !byLine,
-                  onTap: () => setState(() { _onlyMine = true; _lineFilter = null; })),
-              const SizedBox(width: 8),
-            ],
+            _filterChip(c, 'Preferite', _Filter.mine),
+            const SizedBox(width: 8),
+            _filterChip(c, 'Scioperi', _Filter.strikes),
+            const SizedBox(width: 8),
             _lineChip(c, byLine),
           ],
         ),
@@ -221,7 +233,7 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
         ),
       ),
     );
-    if (picked != null && mounted) setState(() { _lineFilter = picked; _onlyMine = false; });
+    if (picked != null && mounted) setState(() { _lineFilter = picked; _filter = _Filter.all; });
   }
 
   Widget _chip(TTColors c, {required String label, required bool active, required VoidCallback onTap}) {
@@ -258,18 +270,29 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
     }
     final data = _data!;
     final byLine = _lineFilter != null;
-    // Gli scioperi sono trasversali al servizio: mostrati quando non si filtra per linea.
+    final filter = byLine ? null : _filter;
+    if (filter == _Filter.mine && myLines.isEmpty) {
+      return const StateView(
+        icon: Icons.star_border,
+        title: 'Nessuna linea preferita',
+        body: 'Salva una fermata (da Arrivi) o una linea (da Mappa) con la stella: '
+            'qui vedrai solo gli avvisi che le riguardano.',
+      );
+    }
+    // Gli scioperi sono trasversali al servizio: nascosti solo filtrando per linea.
     final strikes = byLine ? const <Strike>[] : data.strikes;
     final List<ServiceAlert> alerts;
     if (byLine) {
       alerts = data.serviceAlerts.where((a) => a.lines.contains(_lineFilter)).toList();
-    } else if (_onlyMine) {
+    } else if (filter == _Filter.strikes) {
+      alerts = const [];
+    } else if (filter == _Filter.mine) {
       alerts = data.serviceAlerts.where((a) => a.lines.any(myLines.contains)).toList();
     } else {
       alerts = data.serviceAlerts;
     }
 
-    final unavailable = data.serviceAlertsAvailable
+    final unavailable = data.serviceAlertsAvailable || filter == _Filter.strikes
         ? null
         : Padding(
             padding: const EdgeInsets.only(bottom: TTSpace.x3),
@@ -280,12 +303,19 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
           );
 
     if (strikes.isEmpty && alerts.isEmpty && unavailable == null) {
-      final filtered = byLine || _onlyMine;
+      if (filter == _Filter.strikes) {
+        return const StateView(
+          icon: Icons.check_circle_outline,
+          title: 'Nessuno sciopero in programma',
+          body: 'Gli scioperi del trasporto pubblico a Torino compaiono qui appena annunciati.',
+        );
+      }
+      final filtered = byLine || filter == _Filter.mine;
       return StateView(
         icon: filtered ? Icons.filter_alt_off : Icons.check_circle_outline,
         title: byLine
             ? 'Nessun avviso per la linea $_lineFilter'
-            : _onlyMine
+            : filter == _Filter.mine
                 ? 'Nessun avviso sulle tue linee'
                 : 'Nessun avviso',
         body: filtered
@@ -306,6 +336,9 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
     );
   }
 }
+
+/// Filtri rapidi della lista (il filtro per singola linea li sostituisce).
+enum _Filter { all, mine, strikes }
 
 /// Ordina le linee: prima le numeriche per valore, poi le alfanumeriche.
 int _compareLines(String a, String b) {

@@ -159,7 +159,11 @@ class _HomeShellState extends State<HomeShell> {
     final c = TTColors.of(context);
     final pages = <Widget Function()>[
       () => ArriviScreen(
-          api: _api, favs: _favs, active: _active[0], openStop: _arriviStopRequest),
+          api: _api,
+          favs: _favs,
+          subs: _subs,
+          active: _active[0],
+          openStop: _arriviStopRequest),
       () => MappaScreen(
           api: _api, favs: _favs, active: _active[1], onOpenStop: _openStopInArrivi),
       () => PreferitiScreen(api: _api, favs: _favs, subs: _subs, active: _active[2]),

@@ -154,12 +154,15 @@ class Arrival {
 class ArrivalsResponse {
   final String stopId;
   final String? name;
+  final List<String> lines; // linee che servono la fermata
   final List<Arrival> arrivals;
-  const ArrivalsResponse({required this.stopId, this.name, this.arrivals = const []});
+  const ArrivalsResponse(
+      {required this.stopId, this.name, this.lines = const [], this.arrivals = const []});
 
   factory ArrivalsResponse.fromJson(Map<String, dynamic> j) => ArrivalsResponse(
         stopId: j['stop_id'] as String,
         name: j['name'] as String?,
+        lines: [for (final l in (j['lines'] as List?) ?? const []) l as String],
         arrivals: ((j['arrivals'] as List?) ?? const [])
             .map((e) => Arrival.fromJson(e as Map<String, dynamic>))
             .toList(),

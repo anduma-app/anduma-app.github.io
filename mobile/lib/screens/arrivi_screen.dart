@@ -7,8 +7,10 @@ import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../api/favorites_store.dart';
 import '../api/models.dart';
+import '../api/subscriptions_store.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
+import '../widgets/alert_sheet.dart';
 import '../widgets/arrival_row.dart';
 import '../widgets/info_button.dart';
 import '../widgets/line_pill.dart';
@@ -17,9 +19,15 @@ import '../widgets/state_views.dart';
 
 class ArriviScreen extends StatefulWidget {
   const ArriviScreen(
-      {super.key, required this.api, required this.favs, required this.active, this.openStop});
+      {super.key,
+      required this.api,
+      required this.favs,
+      required this.subs,
+      required this.active,
+      this.openStop});
   final ApiClient api;
   final FavoritesStore favs;
+  final SubscriptionsStore subs;
 
   /// True mentre la tab è visibile e l'app in primo piano (refresh attivo).
   final ValueListenable<bool> active;
@@ -136,6 +144,8 @@ class _ArriviScreenState extends State<ArriviScreen> {
     try {
       final res = await widget.api.arrivals(stop.stopId);
       if (_stop?.stopId != stop.stopId) return; // nel frattempo è cambiata fermata
+      // Tiene aggiornate le linee della fermata se è tra i preferiti (filtro avvisi).
+      widget.favs.updateStopLines(stop.stopId, res.lines);
       if (mounted) {
         setState(() {
           _arrivals = res;
@@ -154,6 +164,18 @@ class _ArriviScreenState extends State<ArriviScreen> {
         setState(() => _loadingArrivals = false);
       }
     }
+  }
+
+  /// Alert "linea in arrivo": linee della fermata più quelle ora in transito.
+  void _openAlerts(Stop stop) {
+    final lines = <String>{
+      ...stop.lines,
+      ..._arrivals?.lines ?? const <String>[],
+      for (final a in _arrivals?.arrivals ?? const <Arrival>[]) ?a.line,
+    }.toList()
+      ..sort();
+    showStopAlertSheet(context,
+        stopId: stop.stopId, stopName: stop.name, lines: lines, subs: widget.subs);
   }
 
   void _clearStop() {
@@ -392,6 +414,18 @@ class _ArriviScreenState extends State<ArriviScreen> {
             ),
           ),
           ListenableBuilder(
+            listenable: widget.subs,
+            builder: (context, _) {
+              final n = widget.subs.countForStop(stop.stopId);
+              return IconButton(
+                icon: Icon(n > 0 ? Icons.notifications_active : Icons.notifications_none,
+                    color: n > 0 ? c.accent : c.inkMuted),
+                tooltip: 'Avvisami all\'arrivo',
+                onPressed: () => _openAlerts(stop),
+              );
+            },
+          ),
+          ListenableBuilder(
             listenable: widget.favs,
             builder: (context, _) {
               final starred = widget.favs.has('stop', stop.stopId);
@@ -405,7 +439,8 @@ class _ArriviScreenState extends State<ArriviScreen> {
                   if (starred) {
                     widget.favs.remove('stop', stop.stopId);
                   } else {
-                    widget.favs.add(LocalFavorite(type: 'stop', ref: stop.stopId, name: stop.name));
+                    widget.favs.add(LocalFavorite(
+                        type: 'stop', ref: stop.stopId, name: stop.name, lines: stop.lines));
                   }
                 },
               );
