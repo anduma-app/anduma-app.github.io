@@ -38,6 +38,7 @@ def test_arrivals(client):
     assert r.status_code == 200
     body = r.json()
     assert body["stop_id"] == "350" and body["name"] == "MASSARI CAP."
+    assert isinstance(body["lines"], list)
     assert [a["line"] for a in body["arrivals"]] == ["55", "10"]
 
     r10 = client.get("/v1/stops/350/arrivals", params={"line": "10"})

@@ -42,5 +42,5 @@ def test_migrations_create_schema(tmp_path):
     finally:
         con.close()
 
-    assert {"devices", "favorites", "subscriptions", "notified_events"} <= tables
+    assert {"devices", "favorites", "subscriptions", "notified_events", "feedback"} <= tables
     assert "alembic_version" in tables

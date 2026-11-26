@@ -26,6 +26,7 @@ from . import realtime, scioperi
 from .cache import RedisCache
 from .config import get_settings
 from .db import db_healthcheck
+from .feedback import router as feedback_router
 from .me import router as me_router
 from .models import (
     AlertsResponse,
@@ -147,6 +148,7 @@ def stop_arrivals(
     return ArrivalsResponse(
         stop_id=stop_id,
         name=stop.name if stop else None,
+        lines=stop.lines if stop else [],
         arrivals=arrivals,
     )
 
@@ -233,4 +235,5 @@ def alerts(
 
 
 api.include_router(me_router)
+api.include_router(feedback_router)
 app.include_router(api)

@@ -8,9 +8,9 @@ grazia (mezzo senza posizione, trip update senza orario, ecc.).
 from __future__ import annotations
 
 import datetime as dt
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 
 class Health(BaseModel):
@@ -67,6 +67,7 @@ class Arrival(BaseModel):
 class ArrivalsResponse(BaseModel):
     stop_id: str
     name: str | None = None
+    lines: list[str] = Field(default_factory=list, description="Linee che servono la fermata")
     arrivals: list[Arrival] = Field(default_factory=list)
 
 
@@ -193,3 +194,12 @@ class SubscriptionOut(BaseModel):
     line: str | None = None
     threshold_min: int | None = None
     active: bool
+
+
+# ------------------------------------------------------------------- feedback
+
+
+class FeedbackCreate(BaseModel):
+    message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=2000)]
+    contact: str | None = Field(None, max_length=200, description="Email o altro recapito")
+    platform: Literal["android", "ios", "web"] | None = None

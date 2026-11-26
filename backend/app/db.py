@@ -104,6 +104,18 @@ class NotifiedEvent(Base):
     subscription: Mapped[Subscription] = relationship(back_populates="notified_events")
 
 
+class Feedback(Base):
+    """Segnalazione o richiesta di funzionalità inviata dall'app (anonima)."""
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    message: Mapped[str] = mapped_column(String(2000))
+    contact: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    platform: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 # --------------------------------------------------------------- engine/session
 def make_engine(settings: Settings | None = None):
     settings = settings or get_settings()
