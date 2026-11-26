@@ -17,7 +17,12 @@ const _torino = LatLng(45.0703, 7.6869);
 
 class MappaScreen extends StatefulWidget {
   const MappaScreen(
-      {super.key, required this.api, required this.favs, required this.active, this.onOpenStop});
+      {super.key,
+      required this.api,
+      required this.favs,
+      required this.active,
+      this.onOpenStop,
+      this.focusStop});
   final ApiClient api;
   final FavoritesStore favs;
 
@@ -27,6 +32,9 @@ class MappaScreen extends StatefulWidget {
 
   /// Apre una fermata negli Arrivi (tap su una fermata della mappa).
   final void Function(String stopId)? onOpenStop;
+
+  /// Richiesta esterna di mostrare una fermata (pulsante mappa in Arrivi/Preferiti).
+  final ValueListenable<Stop?>? focusStop;
 
   @override
   State<MappaScreen> createState() => _MappaScreenState();
@@ -42,10 +50,13 @@ class _MappaScreenState extends State<MappaScreen> {
   List<TransitLine> _lines = const [];
   List<(int, List<LatLng>)> _routePolys = const []; // (direzione, punti)
   List<Stop> _routeStops = const [];
+  Stop? _focus; // fermata evidenziata (con coordinate)
 
   @override
   void initState() {
     super.initState();
+    widget.focusStop?.addListener(_onFocusStop);
+    if (widget.focusStop?.value != null) _onFocusStop();
     widget.active.addListener(_onActiveChanged);
     if (widget.active.value) _subscribe();
     _loadLines();
@@ -75,6 +86,44 @@ class _MappaScreenState extends State<MappaScreen> {
         });
       }
     }
+  }
+
+  /// Centra la mappa sulla fermata richiesta. Se la linea mostrata non vi passa,
+  /// si passa a una delle sue linee, così si vedono i mezzi in arrivo.
+  Future<void> _onFocusStop() async {
+    final req = widget.focusStop?.value;
+    if (req == null) return;
+    var stop = req;
+    if (stop.lat == null || stop.lon == null || stop.lines.isEmpty) {
+      try {
+        stop = await widget.api.stop(req.stopId);
+      } catch (_) {
+        if (stop.lat == null || stop.lon == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Posizione della fermata non disponibile.')));
+          }
+          return;
+        }
+      }
+    }
+    if (!mounted || widget.focusStop?.value != req) return;
+    setState(() => _focus = stop);
+    if (stop.lines.isNotEmpty && !stop.lines.contains(_line)) _changeLine(stop.lines.first);
+    _moveTo(LatLng(stop.lat!, stop.lon!));
+  }
+
+  /// La mappa può non essere ancora disegnata (prima visita alla tab): si ritenta
+  /// al frame successivo.
+  void _moveTo(LatLng point, [int attempts = 5]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        _map.move(point, 17);
+      } catch (_) {
+        if (attempts > 0) _moveTo(point, attempts - 1);
+      }
+    });
   }
 
   Future<void> _loadLines() async {
@@ -124,6 +173,7 @@ class _MappaScreenState extends State<MappaScreen> {
   @override
   void dispose() {
     widget.active.removeListener(_onActiveChanged);
+    widget.focusStop?.removeListener(_onFocusStop);
     _stream?.dispose();
     super.dispose();
   }
@@ -185,6 +235,39 @@ class _MappaScreenState extends State<MappaScreen> {
                         ),
                       ),
                     ),
+                ],
+              ),
+            if (_focus case final f?)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: LatLng(f.lat!, f.lon!),
+                    width: 180,
+                    height: 76,
+                    alignment: Alignment.topCenter, // la punta del segnaposto sulla fermata
+                    child: GestureDetector(
+                      onTap: () => widget.onOpenStop?.call(f.stopId),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: c.surface,
+                              border: Border.all(color: c.accent),
+                              borderRadius: BorderRadius.circular(TTRadius.pill),
+                            ),
+                            child: Text(f.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w700, color: c.ink)),
+                          ),
+                          Icon(Icons.location_on, size: 36, color: c.accent),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             MarkerLayer(

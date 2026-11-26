@@ -133,6 +133,15 @@ def stops_search(
     return provider.gtfs().search_stops(q, limit=limit)
 
 
+@api.get("/stops/{stop_id}", response_model=Stop)
+def stop_detail(stop_id: str, provider: DataProvider = Depends(get_provider)) -> Stop:
+    """Una fermata per id (coordinate e linee), es. per mostrarla sulla mappa."""
+    stop = provider.gtfs().stop(stop_id)
+    if stop is None:
+        raise HTTPException(status_code=404, detail="Fermata non trovata")
+    return stop
+
+
 @api.get("/stops/{stop_id}/arrivals", response_model=ArrivalsResponse)
 def stop_arrivals(
     stop_id: str,

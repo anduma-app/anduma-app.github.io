@@ -99,6 +99,9 @@ class ApiClient {
     return data.map((e) => Stop.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<Stop> stop(String stopId) async =>
+      Stop.fromJson(await _get('/stops/$stopId') as Map<String, dynamic>);
+
   Future<ArrivalsResponse> arrivals(String stopId, {String? line}) async {
     final data = await _get('/stops/$stopId/arrivals', {'line': line}) as Map<String, dynamic>;
     return ArrivalsResponse.fromJson(data);

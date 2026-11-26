@@ -31,6 +31,8 @@ class _HomeShellState extends State<HomeShell> {
   final _arriviStopRequest = ValueNotifier<String?>(null);
   // Richiesta di mostrare gli avvisi di una linea (deep-link push).
   final _avvisiLineRequest = ValueNotifier<String?>(null);
+  // Richiesta di mostrare una fermata sulla mappa (Arrivi, Preferiti).
+  final _mapStopRequest = ValueNotifier<Stop?>(null);
 
   // Tab attiva e visibile (app in primo piano): i timer e gli stream di una
   // schermata girano solo mentre la sua tab è attiva.
@@ -110,6 +112,12 @@ class _HomeShellState extends State<HomeShell> {
     _push.clearDeepLink();
   }
 
+  void _showStopOnMap(Stop stop) {
+    _mapStopRequest.value = null; // notifica anche se è la stessa fermata
+    _mapStopRequest.value = stop;
+    _selectTab(1);
+  }
+
   void _openStopInArrivi(String stopId) {
     _request(_arriviStopRequest, stopId);
     _selectTab(0);
@@ -147,6 +155,7 @@ class _HomeShellState extends State<HomeShell> {
     }
     _arriviStopRequest.dispose();
     _avvisiLineRequest.dispose();
+    _mapStopRequest.dispose();
     _push.dispose();
     _api.close();
     _favs.dispose();
@@ -163,10 +172,17 @@ class _HomeShellState extends State<HomeShell> {
           favs: _favs,
           subs: _subs,
           active: _active[0],
-          openStop: _arriviStopRequest),
+          openStop: _arriviStopRequest,
+          onShowOnMap: _showStopOnMap),
       () => MappaScreen(
-          api: _api, favs: _favs, active: _active[1], onOpenStop: _openStopInArrivi),
-      () => PreferitiScreen(api: _api, favs: _favs, subs: _subs, active: _active[2]),
+          api: _api, favs: _favs, active: _active[1], onOpenStop: _openStopInArrivi,
+          focusStop: _mapStopRequest),
+      () => PreferitiScreen(
+          api: _api,
+          favs: _favs,
+          subs: _subs,
+          active: _active[2],
+          onShowOnMap: _showStopOnMap),
       () => AvvisiScreen(
           api: _api, favs: _favs, active: _active[3], openLine: _avvisiLineRequest),
     ];

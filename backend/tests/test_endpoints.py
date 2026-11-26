@@ -86,3 +86,14 @@ def test_alerts_keep_strikes_when_gtt_feed_down(client, monkeypatch):
     body = client.get("/v1/alerts").json()
     assert body["service_alerts_available"] is False
     assert body["service_alerts"] == [] and len(body["strikes"]) == 2
+
+
+def test_stop_detail(client):
+    r = client.get("/v1/stops/350")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stop_id"] == "350" and body["name"] == "MASSARI CAP."
+    assert (body["lat"], body["lon"]) == (45.07, 7.66)
+    assert client.get("/v1/stops/inesistente").status_code == 404
+    # la ricerca resta raggiungibile (rotta fissa prima di quella parametrica)
+    assert client.get("/v1/stops/search", params={"q": "massari"}).status_code == 200

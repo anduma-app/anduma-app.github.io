@@ -17,13 +17,21 @@ import '../widgets/state_views.dart';
 
 class PreferitiScreen extends StatefulWidget {
   const PreferitiScreen(
-      {super.key, required this.api, required this.favs, required this.subs, required this.active});
+      {super.key,
+      required this.api,
+      required this.favs,
+      required this.subs,
+      required this.active,
+      this.onShowOnMap});
   final ApiClient api;
   final FavoritesStore favs;
   final SubscriptionsStore subs;
 
   /// True mentre la tab è visibile e l'app in primo piano (refresh attivo).
   final ValueListenable<bool> active;
+
+  /// Mostra una fermata sulla mappa (cambio tab gestito dalla shell).
+  final void Function(Stop stop)? onShowOnMap;
 
   @override
   State<PreferitiScreen> createState() => _PreferitiScreenState();
@@ -98,6 +106,7 @@ class _PreferitiScreenState extends State<PreferitiScreen> {
                                   favs: widget.favs,
                                   subs: widget.subs,
                                   loaders: _loaders,
+                                  onShowOnMap: widget.onShowOnMap,
                                 ),
                             ],
                             if (lines.isNotEmpty) ...[
@@ -207,7 +216,9 @@ class _StopCard extends StatefulWidget {
     required this.favs,
     required this.subs,
     required this.loaders,
+    this.onShowOnMap,
   });
+  final void Function(Stop stop)? onShowOnMap;
   final LocalFavorite fav;
   final ApiClient api;
   final FavoritesStore favs;
@@ -286,6 +297,12 @@ class _StopCardState extends State<_StopCard> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+            ),
+            IconButton(
+              icon: Icon(Icons.map_outlined, size: 20, color: c.inkMuted),
+              tooltip: 'Mostra sulla mappa',
+              onPressed: () => widget.onShowOnMap
+                  ?.call(Stop(stopId: widget.fav.ref, name: widget.fav.name)),
             ),
             ListenableBuilder(
               listenable: widget.subs,

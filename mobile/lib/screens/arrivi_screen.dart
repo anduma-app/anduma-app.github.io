@@ -24,7 +24,8 @@ class ArriviScreen extends StatefulWidget {
       required this.favs,
       required this.subs,
       required this.active,
-      this.openStop});
+      this.openStop,
+      this.onShowOnMap});
   final ApiClient api;
   final FavoritesStore favs;
   final SubscriptionsStore subs;
@@ -34,6 +35,9 @@ class ArriviScreen extends StatefulWidget {
 
   /// Richiesta esterna (deep-link da push) di aprire una fermata per id.
   final ValueListenable<String?>? openStop;
+
+  /// Mostra la fermata sulla mappa (cambio tab gestito dalla shell).
+  final void Function(Stop stop)? onShowOnMap;
 
   @override
   State<ArriviScreen> createState() => _ArriviScreenState();
@@ -410,6 +414,11 @@ class _ArriviScreenState extends State<ArriviScreen> {
                         fontSize: 22, fontWeight: FontWeight.w800, color: c.ink, letterSpacing: -0.4)),
               ],
             ),
+          ),
+          IconButton(
+            icon: Icon(Icons.map_outlined, color: c.inkMuted),
+            tooltip: 'Mostra sulla mappa',
+            onPressed: () => widget.onShowOnMap?.call(stop),
           ),
           ListenableBuilder(
             listenable: widget.subs,
