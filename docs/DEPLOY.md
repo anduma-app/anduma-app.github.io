@@ -76,6 +76,16 @@ pubblici), chiave VAPID dai "Certificati push web" di Cloud Messaging. Il browse
 come device `web`. Su iPhone funzionano solo con la web app aggiunta alla schermata Home
 (iOS 16.4+).
 
+### 5b. Dominio anduma.is-a.dev (opzionale)
+
+Sottodominio gratuito di [is-a.dev](https://docs.is-a.dev/guides/github-pages/): una pull
+request su `is-a-dev/register` con il file `domains/anduma.json` (owner = account GitHub,
+record `CNAME` = `emanueledri.github.io`). Solo **dopo** il merge: repo `anduma` →
+Settings → Pages → Custom domain `anduma.is-a.dev` → Save, poi "Enforce HTTPS", e rilancio
+del workflow "Web app". Il base href si adegua da solo (`actions/configure-pages`: `/anduma/`
+senza dominio, `/` con il dominio); `TT_CORS_ORIGINS` ammette già `https://anduma.is-a.dev`.
+Il vecchio indirizzo `emanueledri.github.io/anduma/` reindirizza al dominio.
+
 ### 6. Feedback come issue GitHub (opzionale)
 
 Ogni feedback inviato dall'app viene salvato nella tabella `feedback` di Supabase. Se su

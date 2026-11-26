@@ -32,7 +32,7 @@ services:
         value: "8000"
       # Web app su GitHub Pages (.github/workflows/web.yml).
       - key: TT_CORS_ORIGINS
-        value: https://emanueledri.github.io
+        value: https://emanueledri.github.io,https://anduma.is-a.dev
       # Feedback → issue su questo repo.
       - key: TT_GITHUB_REPO
         value: emanueledri/anduma

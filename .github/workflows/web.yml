@@ -1,6 +1,7 @@
 # Web app (build Flutter web del client) pubblicata su GitHub Pages:
-#   https://emanueledri.github.io/anduma/
-# Parla con il backend su Render; l'origine è ammessa via TT_CORS_ORIGINS (render.yaml).
+#   https://emanueledri.github.io/anduma/  oppure, col dominio personalizzato, https://anduma.is-a.dev/
+# Il base href viene da configure-pages: "/anduma/" senza dominio, "/" con il dominio.
+# Parla con il backend su Render; le origini sono ammesse via TT_CORS_ORIGINS (render.yaml).
 name: Web app
 
 on:
@@ -23,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - id: pages
+        uses: actions/configure-pages@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -32,7 +35,7 @@ jobs:
         working-directory: mobile
         run: |
           flutter pub get
-          flutter build web --release --base-href /anduma/ \
+          flutter build web --release --base-href "${{ steps.pages.outputs.base_path }}/" \
             --dart-define=TT_API_BASE=https://transito-torino.onrender.com
       - uses: actions/upload-pages-artifact@v3
         with:
