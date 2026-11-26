@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import logging
 import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -18,7 +17,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .alerts import PushMessage
 from .db import Device, Favorite, Subscription, get_session
 from .models import (
     DeviceCreate,
@@ -30,10 +28,8 @@ from .models import (
     SubscriptionCreate,
     SubscriptionOut,
 )
-from .push import InvalidTokenError, build_push_service
 
 router = APIRouter(prefix="/me", tags=["me"])
-log = logging.getLogger(__name__)
 
 
 def _hash_secret(secret: str) -> str:
@@ -207,29 +203,6 @@ def delete_subscription(
         raise HTTPException(status_code=404, detail="Sottoscrizione non trovata")
     session.delete(sub)
     session.commit()
-
-
-@router.post("/test-push")
-def test_push(device: Device = Depends(get_current_device)) -> dict:
-    """Invia subito una notifica di prova al device: verifica l'intera catena push."""
-    service = build_push_service()
-    if service is None:
-        raise HTTPException(status_code=503, detail="Notifiche non abilitate sul server")
-    message = PushMessage(
-        device_id=device.id,
-        title="Notifica di prova",
-        body="Le notifiche di Transito Torino funzionano su questo dispositivo.",
-    )
-    try:
-        service.send_now(device.fcm_token, message)
-    except InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=410, detail="Registrazione scaduta: riattiva le notifiche"
-        ) from exc
-    except Exception as exc:
-        log.warning("Notifica di prova fallita per device %s: %s", device.id, exc)
-        raise HTTPException(status_code=502, detail=f"Invio non riuscito: {exc}") from exc
-    return {"sent": True}
 
 
 __all__ = ["router", "get_current_device"]

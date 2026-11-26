@@ -104,10 +104,6 @@ class PushService:
     def __init__(self, sender: PushSender):
         self._sender = sender
 
-    def send_now(self, token: str, message: PushMessage) -> None:
-        """Invio immediato fuori dalla coda (notifica di prova). Propaga gli errori."""
-        self._sender.send(token, message)
-
     def process(self, session: Session, dispatcher: Dispatcher) -> PushResult:
         result = PushResult()
         messages = dispatcher.drain() if hasattr(dispatcher, "drain") else []

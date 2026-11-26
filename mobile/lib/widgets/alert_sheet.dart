@@ -161,14 +161,6 @@ class _StopAlertSheet extends StatefulWidget {
 class _StopAlertSheetState extends State<_StopAlertSheet> {
   int _threshold = 5;
   static const _thresholds = [5, 10, 20];
-  bool _testing = false;
-  String? _testResult;
-
-  Future<void> _sendTest() async {
-    setState(() { _testing = true; _testResult = null; });
-    final msg = await widget.subs.sendTestPush();
-    if (mounted) setState(() { _testing = false; _testResult = msg; });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -228,18 +220,6 @@ class _StopAlertSheetState extends State<_StopAlertSheet> {
                     _notice(c, 'Nessuna linea in transito al momento. Riprova quando vedi gli arrivi.')
                   else
                     ...widget.lines.map((l) => _lineRow(c, l)),
-                  const SizedBox(height: TTSpace.x2),
-                  TextButton.icon(
-                    onPressed: _testing ? null : _sendTest,
-                    icon: _testing
-                        ? const SizedBox(
-                            width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.notifications_outlined, size: 18),
-                    label: const Text('Invia una notifica di prova'),
-                  ),
-                  if (_testResult != null)
-                    Text(_testResult!,
-                        style: TextStyle(fontSize: 13, color: c.inkMuted, height: 1.4)),
                 ],
                 const SizedBox(height: TTSpace.x4),
               ],

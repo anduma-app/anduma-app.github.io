@@ -24,18 +24,6 @@ class SubscriptionsStore extends ChangeNotifier {
   bool get pushAvailable => _push.available;
   bool get loaded => _loaded;
 
-  /// Attiva le push se serve e invia una notifica di prova. Ritorna il testo
-  /// da mostrare all'utente.
-  Future<String> sendTestPush() async {
-    if (!await _push.enable()) {
-      return 'Notifiche non attive: consentile nelle impostazioni del telefono o del browser.';
-    }
-    final error = await _api.testPush();
-    return error == null
-        ? 'Notifica inviata: dovrebbe arrivare entro pochi secondi.'
-        : 'Notifica di prova non riuscita: $error';
-  }
-
   /// Sottoscrizioni "imminent" attive per una fermata.
   List<Subscription> imminentForStop(String stopId) =>
       _subs.where((s) => s.kind == 'imminent' && s.stopId == stopId).toList();
