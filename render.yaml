@@ -1,0 +1,29 @@
+# Blueprint Render: backend in un solo container free (API + scheduler alert/push).
+# Database: PostgreSQL esterno (Supabase free). Niente Redis: con una sola istanza
+# basta la cache in memoria. Procedura completa in docs/DEPLOY.md.
+services:
+  - type: web
+    name: transito-torino
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      # Richiesti alla creazione del Blueprint (non versionati).
+      - key: TT_DATABASE_URL # stringa "Session pooler" di Supabase, incollata così com'è
+        sync: false
+      - key: TT_FCM_CREDENTIALS_JSON # contenuto di backend/secrets/firebase-admin.json
+        sync: false
+      # Scheduler nel processo API: UNA sola istanza, niente scaling orizzontale.
+      - key: TT_SCHEDULER_ENABLED
+        value: "true"
+      - key: TT_FCM_ENABLED
+        value: "true"
+      - key: PORT
+        value: "8000"
+      # Il keep-alive (TT_KEEPALIVE_URL) si attiva da solo leggendo RENDER_EXTERNAL_URL.

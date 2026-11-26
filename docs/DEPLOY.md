@@ -1,0 +1,71 @@
+# Deploy gratuito: Render + Supabase
+
+Backend in un solo container sul piano free di Render, con API e scheduler alert/push
+nello stesso processo. PostgreSQL gratuito su Supabase. Niente Redis né worker separato.
+La configurazione è in [`render.yaml`](../render.yaml).
+
+## Perché questi servizi
+
+- **Render free**: 512 MB di RAM e 0,1 CPU. Il backend arriva a circa 250 MB di picco
+  (misurato a novembre 2026 con il GTFS reale e lo scheduler attivo). Il servizio si spegne
+  dopo 15 minuti senza traffico in ingresso: lo scheduler chiama da solo
+  `RENDER_EXTERNAL_URL/health` ogni 10 minuti (`TT_KEEPALIVE_URL`, job `keepalive`).
+  Le 750 ore mensili gratuite coprono un solo servizio acceso 24/7.
+- **Supabase free**: database sempre acceso, 500 MB. Neon non va bene: il motore alert
+  interroga il DB ogni 15 s, quindi il calcolo non va mai in pausa e supera le 100 ore
+  mensili del piano free. Il Postgres free di Render scade dopo 30 giorni.
+
+## Procedura (una tantum)
+
+### 1. Supabase
+
+1. Crea un progetto su <https://supabase.com>, regione **Central EU (Frankfurt)**.
+   Usa una password solo alfanumerica (evita di doverla codificare nell'URL).
+2. **Connect** → **Session pooler** → copia la stringa `postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-…pooler.supabase.com:5432/postgres`
+   e sostituisci `[YOUR-PASSWORD]`.
+   Non usare la "Direct connection" (solo IPv6) né il "Transaction pooler" (porta 6543).
+
+Il prefisso `postgresql://` va bene così: l'app forza da sola il driver psycopg 3.
+Le tabelle le crea il container al primo avvio (`alembic upgrade head`).
+
+### 2. Credenziali Firebase
+
+Copia negli appunti il JSON della service account su una riga sola:
+
+```bash
+python3 -c "import json;print(json.dumps(json.load(open('backend/secrets/firebase-admin.json'))))" | pbcopy
+```
+
+### 3. Render
+
+1. Il `render.yaml` deve essere sul branch `main` di GitHub.
+2. <https://dashboard.render.com> → **New** → **Blueprint** → collega il repo `anduma`.
+3. Alla richiesta delle variabili incolla:
+   - `TT_DATABASE_URL`: la stringa di Supabase;
+   - `TT_FCM_CREDENTIALS_JSON`: il JSON copiato al passo 2.
+4. **Apply**. Il primo build richiede qualche minuto; poi verifica:
+
+```bash
+curl https://transito-torino.onrender.com/health
+# atteso: "status":"ok", "gtfs_loaded":true, "db":true
+```
+
+Se il nome `transito-torino` è già preso, Render aggiunge un suffisso: usa l'URL mostrato
+nella dashboard.
+
+### 4. App
+
+```bash
+cd mobile
+flutter build appbundle --dart-define=TT_API_BASE=https://transito-torino.onrender.com
+```
+
+## Esercizio
+
+- Ogni push su `main` rideploya. Il DB è su Supabase, quindi dispositivi e preferiti restano.
+- Dopo un riavvio il primo `/health` può impiegare circa un minuto (download e parsing del GTFS
+  con 0,1 CPU).
+- Non aumentare le istanze: lo scheduler gira nel processo API e i job si duplicherebbero.
+- Supabase mette in pausa i progetti free inattivi per una settimana. Con lo scheduler che
+  interroga il DB ogni 15 s non dovrebbe succedere. Se succede, riattiva il progetto dalla
+  dashboard.

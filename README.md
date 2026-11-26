@@ -39,7 +39,8 @@ Client Flutter (mappa, arrivi, preferiti) ────────────�
 ```
 
 In produzione: container API + container **worker** (scheduler alert e push, una sola replica),
-PostgreSQL e Redis. Stessa immagine (`backend/Dockerfile`).
+PostgreSQL e Redis. Stessa immagine (`backend/Dockerfile`). Per l'hosting gratuito
+(un solo container su Render + PostgreSQL su Supabase) vedi [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 **Vincolo chiave:** il polling dei feed lo fa **solo il backend**, con cache condivisa
 (rate limit + batteria). I feed RT sono **protobuf binari**, non JSON.
