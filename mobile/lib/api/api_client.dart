@@ -45,6 +45,7 @@ class ApiClient {
   Never _raise(int code) {
     if (code == 401) throw ApiException('Device non registrato');
     if (code == 404) throw ApiException('Non trovato');
+    if (code == 429) throw ApiException('Troppi invii: riprova tra un minuto');
     throw ApiException('Errore server ($code)');
   }
 

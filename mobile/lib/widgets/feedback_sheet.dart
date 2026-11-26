@@ -29,6 +29,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
   final _message = TextEditingController();
   final _contact = TextEditingController();
   bool _sending = false;
+  String? _error;
 
   @override
   void initState() {
@@ -46,16 +47,23 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
   Future<void> _send() async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
     final api = ApiClient();
     try {
       await api.sendFeedback(message: _message.text.trim(), contact: _contact.text);
       navigator.pop();
       messenger.showSnackBar(const SnackBar(content: Text('Grazie! Feedback inviato.')));
-    } catch (_) {
-      if (mounted) setState(() => _sending = false);
-      messenger.showSnackBar(
-          const SnackBar(content: Text('Invio non riuscito: controlla la connessione e riprova.')));
+    } on ApiException catch (e) {
+      // Mostrato nel modulo: uno SnackBar resterebbe dietro il foglio.
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _error = 'Invio non riuscito: ${e.message}.';
+        });
+      }
     } finally {
       api.close();
     }
@@ -105,6 +113,17 @@ class _FeedbackSheetState extends State<_FeedbackSheet> {
                 border: OutlineInputBorder(),
               ),
             ),
+            Text(
+              'Il messaggio sarà pubblicato come segnalazione pubblica nel progetto su GitHub. '
+              "L'email resta privata e non viene pubblicata.",
+              style: TextStyle(fontSize: 12, color: c.inkMuted, height: 1.4),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: TTSpace.x2),
+              Text(_error!,
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600, color: TTStatus.strike.base)),
+            ],
             const SizedBox(height: TTSpace.x3),
             FilledButton.icon(
               onPressed: canSend ? _send : null,
