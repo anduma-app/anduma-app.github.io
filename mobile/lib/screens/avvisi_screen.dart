@@ -77,20 +77,6 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
     } catch (_) {
       if (mounted) setState(() { _failed = true; _loading = false; });
     }
-    _fillMissingStopLines();
-  }
-
-  /// Fermate salvate prima che se ne memorizzassero le linee: le si recupera
-  /// dal backend, così il filtro "Preferite" le include.
-  Future<void> _fillMissingStopLines() async {
-    for (final f in widget.favs.stops.where((f) => f.lines.isEmpty)) {
-      try {
-        final res = await widget.api.arrivals(f.ref);
-        await widget.favs.updateStopLines(f.ref, res.lines);
-      } catch (_) {
-        // riprova al prossimo caricamento
-      }
-    }
   }
 
   /// Linee presenti negli avvisi di servizio correnti (per il picker).
@@ -108,7 +94,7 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
       child: ListenableBuilder(
         listenable: widget.favs,
         builder: (context, _) {
-          final myLines = widget.favs.allLines;
+          final myLines = widget.favs.lines.map((f) => f.ref).toSet();
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -275,8 +261,8 @@ class _AvvisiScreenState extends State<AvvisiScreen> {
       return const StateView(
         icon: Icons.star_border,
         title: 'Nessuna linea preferita',
-        body: 'Salva una fermata (da Arrivi) o una linea (da Mappa) con la stella: '
-            'qui vedrai solo gli avvisi che le riguardano.',
+        body: 'Salva una linea con la stella dalla Mappa: qui vedrai solo gli avvisi '
+            'che la riguardano.',
       );
     }
     // Gli scioperi sono trasversali al servizio: nascosti solo filtrando per linea.

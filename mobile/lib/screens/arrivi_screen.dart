@@ -144,8 +144,6 @@ class _ArriviScreenState extends State<ArriviScreen> {
     try {
       final res = await widget.api.arrivals(stop.stopId);
       if (_stop?.stopId != stop.stopId) return; // nel frattempo è cambiata fermata
-      // Tiene aggiornate le linee della fermata se è tra i preferiti (filtro avvisi).
-      widget.favs.updateStopLines(stop.stopId, res.lines);
       if (mounted) {
         setState(() {
           _arrivals = res;
@@ -439,8 +437,7 @@ class _ArriviScreenState extends State<ArriviScreen> {
                   if (starred) {
                     widget.favs.remove('stop', stop.stopId);
                   } else {
-                    widget.favs.add(LocalFavorite(
-                        type: 'stop', ref: stop.stopId, name: stop.name, lines: stop.lines));
+                    widget.favs.add(LocalFavorite(type: 'stop', ref: stop.stopId, name: stop.name));
                   }
                 },
               );

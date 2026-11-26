@@ -9,19 +9,15 @@ class LocalFavorite {
   final String type; // 'stop' | 'line'
   final String ref; // stop_id oppure numero linea
   final String name; // nome visualizzato (nome fermata o "Linea X")
-  final List<String> lines; // per le fermate: linee che la servono (filtro avvisi)
 
-  const LocalFavorite(
-      {required this.type, required this.ref, required this.name, this.lines = const []});
+  const LocalFavorite({required this.type, required this.ref, required this.name});
 
-  Map<String, dynamic> toJson() =>
-      {'type': type, 'ref': ref, 'name': name, if (lines.isNotEmpty) 'lines': lines};
+  Map<String, dynamic> toJson() => {'type': type, 'ref': ref, 'name': name};
 
   factory LocalFavorite.fromJson(Map<String, dynamic> j) => LocalFavorite(
         type: j['type'] as String,
         ref: j['ref'] as String,
         name: (j['name'] as String?) ?? (j['ref'] as String),
-        lines: [for (final l in (j['lines'] as List?) ?? const []) l as String],
       );
 
   @override
@@ -43,12 +39,6 @@ class FavoritesStore extends ChangeNotifier {
       _favs.where((f) => f.type == 'stop').toList();
   List<LocalFavorite> get lines =>
       _favs.where((f) => f.type == 'line').toList();
-
-  /// Linee "preferite": quelle salvate più quelle delle fermate salvate.
-  Set<String> get allLines => {
-        for (final f in _favs)
-          if (f.type == 'line') f.ref else ...f.lines,
-      };
 
   bool has(String type, String ref) =>
       _favs.any((f) => f.type == type && f.ref == ref);
@@ -77,16 +67,6 @@ class FavoritesStore extends ChangeNotifier {
   Future<void> add(LocalFavorite fav) async {
     if (has(fav.type, fav.ref)) return;
     _favs = [..._favs, fav];
-    notifyListeners();
-    await _persist();
-  }
-
-  /// Completa le linee di una fermata salvata prima che venissero memorizzate.
-  Future<void> updateStopLines(String stopId, List<String> lines) async {
-    final i = _favs.indexWhere((f) => f.type == 'stop' && f.ref == stopId);
-    if (i < 0 || lines.isEmpty || listEquals(_favs[i].lines, lines)) return;
-    final f = _favs[i];
-    _favs = [..._favs]..[i] = LocalFavorite(type: f.type, ref: f.ref, name: f.name, lines: lines);
     notifyListeners();
     await _persist();
   }
