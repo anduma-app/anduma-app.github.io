@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
+import 'firebase_web_config.dart';
 
 /// Destinazione di navigazione derivata dal payload `data` di una push.
 class AppDeepLink {
@@ -71,7 +72,7 @@ class PushManager {
 
     // 2) Firebase: se non configurato, si resta senza push.
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(options: kIsWeb ? firebaseWebOptions : null);
       available = true;
     } catch (e) {
       debugPrint('Push disabilitate (Firebase non configurato): $e');
@@ -79,7 +80,8 @@ class PushManager {
     }
 
     final fm = FirebaseMessaging.instance;
-    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+    // Sul web le notifiche in background le mostra web/firebase-messaging-sw.js.
+    if (!kIsWeb) FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
     fm.onTokenRefresh.listen(_onTokenRefresh);
     FirebaseMessaging.onMessage.listen((m) => foreground.value = m);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleOpened);
@@ -118,7 +120,11 @@ class PushManager {
     if (_registering) return false;
     _registering = true;
     try {
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await FirebaseMessaging.instance.getToken(
+        vapidKey: kIsWeb ? firebaseWebVapidKey : null,
+        // Relativo alla pagina: l'app web non è servita dalla radice del dominio.
+        serviceWorkerScriptPath: kIsWeb ? 'firebase-messaging-sw.js' : null,
+      );
       if (token == null) return false;
       await _api.registerDevice(token: token);
       final prefs = await SharedPreferences.getInstance();

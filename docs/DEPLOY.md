@@ -67,9 +67,14 @@ Flutter per il web e lo pubblica su GitHub Pages a ogni push su `main` che tocca
 <https://emanueledri.github.io/anduma/>. Il backend ammette quell'origine con
 `TT_CORS_ORIGINS` (impostata in `render.yaml`).
 
-Differenze rispetto all'app nativa: niente notifiche push (Firebase non è configurato per il
-web) e preferiti salvati nel browser. Da smartphone: apri il link e usa "Aggiungi a schermata
-Home".
+Da smartphone: apri il link e usa "Aggiungi a schermata Home". I preferiti restano salvati nel
+browser.
+
+Push web: app Web "Transito web" nel progetto Firebase, configurazione in
+`mobile/lib/api/firebase_web_config.dart` e `mobile/web/firebase-messaging-sw.js` (stessi valori,
+pubblici), chiave VAPID dai "Certificati push web" di Cloud Messaging. Il browser si registra
+come device `web`. Su iPhone funzionano solo con la web app aggiunta alla schermata Home
+(iOS 16.4+).
 
 ## Esercizio
 

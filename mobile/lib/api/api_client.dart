@@ -122,7 +122,11 @@ class ApiClient {
 
   /// Registra (o ri-registra) il device col token FCM e ne memorizza le credenziali.
   Future<void> registerDevice({required String token}) async {
-    final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+    final platform = kIsWeb
+        ? 'web'
+        : defaultTargetPlatform == TargetPlatform.iOS
+            ? 'ios'
+            : 'android';
     final data = await _send('POST', '/me/devices', {'platform': platform, 'token': token})
         as Map<String, dynamic>;
     deviceId = (data['id'] as num).toInt();
