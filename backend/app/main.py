@@ -19,6 +19,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
 from . import realtime, scioperi
@@ -77,6 +78,15 @@ app = FastAPI(
     description=ATTRIBUTION,
     lifespan=lifespan,
 )
+
+# CORS solo per le origini configurate (es. la web app su GitHub Pages).
+if get_settings().cors_origin_list:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=get_settings().cors_origin_list,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # API versionata (SPEC §4); /health resta fuori per il monitoraggio.
 api = APIRouter(prefix="/v1")

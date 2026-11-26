@@ -36,3 +36,9 @@ def test_database_url_forces_psycopg_driver():
     for url in ("postgres://u:p@h:5432/db", "postgresql://u:p@h:5432/db"):
         assert Settings(database_url=url).database_url == "postgresql+psycopg://u:p@h:5432/db"
     assert Settings(database_url="sqlite:///./t.db").database_url == "sqlite:///./t.db"
+
+
+def test_cors_origin_list_parsing():
+    s = Settings(cors_origins=" https://a.github.io/ , https://b.org ")
+    assert s.cors_origin_list == ["https://a.github.io", "https://b.org"]
+    assert Settings(cors_origins="").cors_origin_list == []

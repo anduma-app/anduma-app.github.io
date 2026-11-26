@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     # Tetto di connessioni WS simultanee (backpressure).
     ws_max_connections: int = 500
 
+    # --- CORS (client web) ---
+    # Origini ammesse, separate da virgola. Vuoto → nessun header CORS (solo app native).
+    cors_origins: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
     # --- Keep-alive (hosting free che spegne il servizio senza traffico in ingresso) ---
     # Se valorizzato, lo scheduler chiama ``<url>/health`` ogni ``keepalive_interval_s``.
     # Su Render viene letto in automatico da RENDER_EXTERNAL_URL.
