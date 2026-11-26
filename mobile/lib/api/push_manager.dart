@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'firebase_web_config.dart';
+import 'push_sw_stub.dart' if (dart.library.js_interop) 'push_sw_web.dart';
 
 /// Destinazione di navigazione derivata dal payload `data` di una push.
 class AppDeepLink {
@@ -53,7 +54,7 @@ class PushManager {
   /// Ultimo messaggio ricevuto in foreground (per un banner in-app).
   final ValueNotifier<RemoteMessage?> foreground = ValueNotifier(null);
 
-  bool _registering = false;
+  Future<bool>? _registering;
 
   /// Inizializza Firebase + FCM. Idempotente, non lancia mai.
   ///
@@ -116,10 +117,14 @@ class PushManager {
     }
   }
 
-  Future<bool> _registerOnce() async {
-    if (_registering) return false;
-    _registering = true;
+  /// Una registrazione alla volta: chi arriva durante quella in corso (es. il tap
+  /// su un alert mentre gira quella d'avvio) ne attende l'esito.
+  Future<bool> _registerOnce() =>
+      _registering ??= _doRegister().whenComplete(() => _registering = null);
+
+  Future<bool> _doRegister() async {
     try {
+      await ensurePushServiceWorker();
       final token = await FirebaseMessaging.instance.getToken(
         vapidKey: kIsWeb ? firebaseWebVapidKey : null,
         // Relativo alla pagina: l'app web non è servita dalla radice del dominio.
@@ -135,8 +140,6 @@ class PushManager {
     } catch (e) {
       debugPrint('Registrazione device fallita: $e');
       return false;
-    } finally {
-      _registering = false;
     }
   }
 

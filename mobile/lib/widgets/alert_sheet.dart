@@ -62,7 +62,7 @@ class _LineAlertSheet extends StatelessWidget {
       messenger.showSnackBar(SnackBar(
         content: Text(subs.ready
             ? 'Operazione non riuscita. Riprova.'
-            : 'Notifiche non attive: consenti le notifiche nelle impostazioni del telefono.'),
+            : 'Notifiche non attive: consentile nelle impostazioni del telefono o del browser.'),
       ));
     }
   }
@@ -299,7 +299,7 @@ class _StopAlertSheetState extends State<_StopAlertSheet> {
       messenger.showSnackBar(SnackBar(
         content: Text(widget.subs.ready
             ? 'Operazione non riuscita. Riprova.'
-            : 'Notifiche non attive: consenti le notifiche nelle impostazioni del telefono.'),
+            : 'Notifiche non attive: consentile nelle impostazioni del telefono o del browser.'),
       ));
     }
   }
