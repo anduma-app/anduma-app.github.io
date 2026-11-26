@@ -185,3 +185,9 @@ def test_save_and_reread_roundtrip(client):
     subs = client.get("/v1/me/subscriptions", headers=h).json()
     assert favs[0]["ref"] == "350"
     assert subs[0]["threshold_min"] == 3
+
+
+def test_register_web_device(client):
+    r = client.post("/v1/me/devices", json={"platform": "web", "token": "tok-web"})
+    assert r.status_code in (200, 201)
+    assert r.json()["platform"] == "web"

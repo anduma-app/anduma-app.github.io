@@ -44,7 +44,7 @@ class Device(Base):
     __tablename__ = "devices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    platform: Mapped[str] = mapped_column(String(16))  # 'android' | 'ios'
+    platform: Mapped[str] = mapped_column(String(16))  # 'android' | 'ios' | 'web'
     fcm_token: Mapped[str] = mapped_column(String(512), unique=True)
     # SHA-256 del segreto restituito alla registrazione (il segreto non si salva).
     secret_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)

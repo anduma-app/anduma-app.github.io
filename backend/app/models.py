@@ -124,7 +124,7 @@ class AlertsResponse(BaseModel):
 
 
 class DeviceCreate(BaseModel):
-    platform: Literal["android", "ios"]
+    platform: Literal["android", "ios", "web"]
     token: str = Field(..., min_length=1, description="Token push FCM")
 
 
