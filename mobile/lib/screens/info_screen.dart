@@ -1,7 +1,8 @@
-// Schermata Informazioni / Fonti dati — crediti obbligatori (licenze).
+// Schermata Informazioni: come funziona l'app, feedback, fonti dati (crediti obbligatori).
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import '../widgets/feedback_sheet.dart';
 
 class InfoScreen extends StatelessWidget {
   const InfoScreen({super.key});
@@ -50,6 +51,42 @@ class InfoScreen extends StatelessWidget {
         padding: const EdgeInsets.all(TTSpace.x5),
         children: [
           _appHeader(c),
+          const SizedBox(height: TTSpace.x5),
+          Text(
+            'Transito Torino ti dice quando passa il prossimo bus, tram o metro a Torino. '
+            'Usa i dati aperti ufficiali della Città di Torino e di GTT, che il nostro server '
+            'aggiorna in continuazione. I tempi di arrivo sono stime GTT e possono '
+            'differire da quelli reali.',
+            style: TextStyle(fontSize: 14, color: c.ink, height: 1.5),
+          ),
+          const SizedBox(height: TTSpace.x6),
+          sectionLabel('COSA PUOI FARE'),
+          credit(Icons.schedule, 'Arrivi',
+              'Cerca una fermata per nome o numero di palina e guarda i prossimi passaggi '
+                  'in tempo reale.'),
+          credit(Icons.map_outlined, 'Mappa',
+              'Scegli una linea e segui i mezzi lungo il percorso.'),
+          credit(Icons.star_border, 'Preferiti',
+              'Salva fermate e linee con la stella per ritrovarle subito.'),
+          credit(Icons.notifications_none, 'Notifiche',
+              'Tocca la campanella su una fermata per essere avvisato quando la tua linea sta '
+                  'arrivando, oppure su una linea preferita per scioperi e deviazioni.'),
+          credit(Icons.campaign_outlined, 'Avvisi',
+              'Deviazioni e scioperi in corso, filtrabili per linee preferite, solo scioperi '
+                  'o singola linea.'),
+          const SizedBox(height: TTSpace.x5),
+          sectionLabel('FEEDBACK'),
+          Text(
+            'Hai trovato un problema o ti manca qualcosa? Scrivici: valgono anche le richieste '
+            'di nuove funzionalità.',
+            style: TextStyle(fontSize: 13, color: c.inkMuted, height: 1.45),
+          ),
+          const SizedBox(height: TTSpace.x3),
+          FilledButton.icon(
+            onPressed: () => showFeedbackSheet(context),
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('Invia un feedback'),
+          ),
           const SizedBox(height: TTSpace.x6),
           sectionLabel('FONTI DATI'),
           credit(Icons.directions_transit, 'Trasporto pubblico',

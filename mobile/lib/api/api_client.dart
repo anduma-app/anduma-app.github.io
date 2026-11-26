@@ -174,5 +174,19 @@ class ApiClient {
 
   Future<void> deleteSubscription(int id) => _delete('/me/subscriptions/$id');
 
+  /// Segnalazione o richiesta di funzionalità (anonima, senza device registrato).
+  Future<void> sendFeedback({required String message, String? contact}) async {
+    final platform = kIsWeb
+        ? 'web'
+        : defaultTargetPlatform == TargetPlatform.iOS
+            ? 'ios'
+            : 'android';
+    await _send('POST', '/feedback', {
+      'message': message,
+      if (contact != null && contact.trim().isNotEmpty) 'contact': contact.trim(),
+      'platform': platform,
+    });
+  }
+
   void close() => _client.close();
 }
