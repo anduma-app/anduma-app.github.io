@@ -77,7 +77,7 @@ Tracciato e fermate della linea per la mappa.
 → `{ "line", "polylines": [ { "direction", "points": [[lat, lon], ...] } ], "stops": [Stop] }`
 
 ### `GET /alerts?line={opt}`
-Avvisi GTT + scioperi MIT rilevanti per Torino.
+Avvisi GTT + scioperi rilevanti per Torino (calendario CGSSE).
 ```json
 { "service_alerts": [ { "header", "description", "effect", "lines": ["10"] } ],
   "service_alerts_available": true,
@@ -113,7 +113,7 @@ Scheduler APScheduler:
 - **imminent** (ogni ~15 s): per ogni sottoscrizione, leggi gli arrivi previsti alla `stop_id` per la
   `line`; se `eta_minutes <= threshold_min` e non già notificato per quel `trip_id`, accoda push.
   Deduplica per `(subscription_id, trip_id)` con TTL finché il mezzo non è passato.
-- **strike** (ogni ~1 h): per ogni sciopero rilevante per GTT (feed RSS MIT: TPL/generale/
+- **strike** (ogni ~1 h): per ogni sciopero rilevante per GTT (calendario CGSSE: TPL/generale/
   plurisettoriale, nazionale su tutta Italia o in Piemonte/Torino), notifica una volta ogni device con
   sottoscrizioni `strike`. Da fare: reminder il giorno prima e il mattino stesso; avviso anche a
   chi ha solo preferiti.

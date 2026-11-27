@@ -95,7 +95,7 @@ class InfoScreen extends StatelessWidget {
               'Città di Torino / GTT — licenza CC BY 4.0'),
           credit(Icons.schedule, 'Arrivi in tempo reale', '5T / Muoversi a Torino'),
           credit(Icons.warning_amber_rounded, 'Scioperi',
-              'MIT — Osservatorio sui Conflitti Sindacali'),
+              'Commissione di Garanzia Sciopero (CGSSE)'),
           credit(Icons.map_outlined, 'Mappa', '© OpenStreetMap contributors'),
           const SizedBox(height: TTSpace.x5),
           _footer(c),

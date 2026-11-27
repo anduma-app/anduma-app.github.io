@@ -25,7 +25,7 @@ Tutto sotto `/v1`, tranne `/health`.
 - `GET /health` — `status` `ok`|`degraded`, età del GTFS, DB, cache
 - `GET /v1/lines`, `GET /v1/lines/{line}/vehicles`, `GET /v1/lines/{line}/shape`
 - `GET /v1/stops/search?q=&limit=`, `GET /v1/stops/{stop_id}/arrivals?line=`
-- `GET /v1/alerts?line=` — avvisi GTT + scioperi MIT rilevanti per Torino
+- `GET /v1/alerts?line=` — avvisi GTT + scioperi rilevanti per Torino
 - `WS /v1/ws/lines/{line}` — posizioni dei mezzi ogni ~4 s dalla cache condivisa
 - `/v1/me/*` — device, preferiti, sottoscrizioni alert
 
@@ -68,4 +68,4 @@ L'immagine (`Dockerfile`) applica le migrazioni Alembic all'avvio dell'API. Migr
 - Download falliti: si serve l'ultimo dato valido e si ritenta dopo `TT_RETRY_BACKOFF_S` (300 s).
 - Feed RT giù: ultimo payload valido fino a 1 h; `/v1/alerts` restituisce comunque gli scioperi.
 
-Dati: "Città di Torino / GTT" (CC BY 4.0); arrivi "5T / Muoversi a Torino"; scioperi MIT — Osservatorio sui Conflitti Sindacali.
+Dati: "Città di Torino / GTT" (CC BY 4.0); arrivi "5T / Muoversi a Torino"; scioperi "Commissione di Garanzia Sciopero (CGSSE)".

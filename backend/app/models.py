@@ -96,7 +96,7 @@ class ServiceAlert(BaseModel):
 
 
 class Strike(BaseModel):
-    """Sciopero dal feed MIT, normalizzato in modo difensivo.
+    """Sciopero (calendario CGSSE o feed MIT), normalizzato in modo difensivo.
 
     ``raw`` conserva tutti i campi originali (e il ``guid``): il formato del
     feed può cambiare nel tempo, quindi non perdiamo informazione.

@@ -1,10 +1,11 @@
-"""Scioperi dei trasporti (MIT): parser difensivo del feed RSS + filtro per GTT.
+"""Scioperi dei trasporti: calendario CGSSE (fonte in uso) o feed RSS MIT + filtro per GTT.
 
-Il feed RSS dell'Osservatorio sui Conflitti Sindacali elenca gli scioperi in
-programma; ogni ``<item>`` porta i campi come righe ``Chiave: valore`` nella
-descrizione. Le chiavi si riconoscono in modo case-insensitive su più alias,
-perché il formato può cambiare nel tempo. (Il vecchio CSV su dati.mit.gov.it
-è fermo al 2020 e non va usato.)
+Fonte in uso: il calendario della Commissione di Garanzia Sciopero (cgsse.it),
+letto dall'elenco HTML. Il feed RSS del MIT (Osservatorio sui Conflitti Sindacali)
+ha gli stessi dati, ma il sito non risponde ai server in datacenter (Render, GitHub
+Actions): il parser resta per le fixture e per chi ospita il backend in Italia.
+Il downloader salva gli scioperi già normalizzati in JSON; ``parse_strikes`` legge
+sia quello sia l'RSS. (Il vecchio CSV su dati.mit.gov.it è fermo al 2020.)
 
 Per Torino si tengono gli scioperi del trasporto pubblico locale e quelli
 generali/plurisettoriali, se nazionali su tutta Italia o in Piemonte/Torino; in
@@ -14,6 +15,9 @@ Piemonte anche il ferroviario (GTT gestisce la ferrovia Torino-Ceres).
 from __future__ import annotations
 
 import datetime as dt
+import html
+import json
+import re
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -160,25 +164,148 @@ def filter_upcoming(strikes: list[Strike], today: dt.date | None = None) -> list
     return [s for s in strikes if is_active_strike(s, today)]
 
 
-def download_strikes_rss(settings: Settings | None = None) -> str:
-    """Scarica il feed RSS scioperi (rete). Isolato per testabilità."""
+# ------------------------------------------------------------------------ CGSSE
+_CGSSE_FIELD = re.compile(r'label-sciopero">\s*([^<]+?)\s*</div>(.*?)</div>', re.S)
+_CGSSE_ID = re.compile(r"/calendario-scioperi/dettaglio-sciopero/(\d+)")
+_CGSSE_DATE = re.compile(r"(\d{2})-(\d{2})-(\d{4})")
+_CGSSE_PAGE_SIZE = 15  # righe per pagina dell'elenco
+_CGSSE_MAX_PAGES = 5  # tetto per un singolo giorno con molte righe
+_CGSSE_DAYS = 120  # quanto avanti leggere il calendario
+# Settori che possono fermare GTT (id della tassonomia del sito): TPL (anche gli
+# scioperi multisettore che lo includono), ferroviario, generali e plurisettoriali
+# nazionali/regionali/provinciali. Gli altri non servono e allungherebbero l'elenco.
+_CGSSE_SECTORS = ("112", "110", "382", "384", "386", "376", "378")
+
+
+def _text(fragment: str) -> str:
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", fragment)).split())
+
+
+def cgsse_ids(page: str) -> list[str]:
+    """Id degli scioperi in una pagina dell'elenco, in ordine e senza ripetizioni."""
+    return list(dict.fromkeys(_CGSSE_ID.findall(page)))
+
+
+def parse_cgsse(listing: str, revoked_ids: set[str] | frozenset[str] = frozenset()) -> list[Strike]:
+    """Scioperi dall'elenco HTML del calendario CGSSE (anche più pagine concatenate).
+
+    Ogni riga ha Data, Settore, Azienda, Sindacato, Ambito geografico, Modalità e il
+    link al dettaglio (il cui id fa da ``guid``). L'elenco include anche gli scioperi
+    revocati, senza segnarli: si escludono con ``revoked_ids`` (elenco con il filtro
+    ``revocato=1``). Ambito vuoto = sciopero nazionale.
+    """
+    rows: list[dict[str, str]] = []
+    for key, value in _CGSSE_FIELD.findall(listing):
+        if key == "Data":
+            rows.append({})
+        if not rows:
+            continue
+        if key == "Dettagli":
+            ids = _CGSSE_ID.findall(value)
+            if ids:
+                rows[-1]["id"] = ids[0]
+        else:
+            rows[-1][key] = _text(value)
+    out: list[Strike] = []
+    seen: set[str] = set()
+    for row in rows:
+        sid = row.get("id")
+        if not sid or sid in seen or sid in revoked_ids:
+            continue
+        seen.add(sid)
+        dates = ["/".join(d) for d in _CGSSE_DATE.findall(row.get("Data", ""))]
+        area = row.get("Ambito geografico") or None
+        raw = {k: v for k, v in row.items() if k != "id"}
+        raw["guid"] = f"https://cgsse.it/calendario-scioperi/dettaglio-sciopero/{sid}"
+        out.append(
+            Strike(
+                start_date=dates[0] if dates else None,
+                end_date=dates[-1] if dates else None,
+                sector=row.get("Settore") or None,
+                relevance="Locale" if area else "Nazionale",
+                area=area,
+                unions=row.get("Sindacato") or None,
+                category=row.get("Azienda") or None,
+                raw=raw,
+            )
+        )
+    return out
+
+
+def _cgsse_window(
+    client: httpx.Client, url: str, params: dict, start: dt.date, end: dt.date
+) -> list[str]:
+    """Pagine dell'elenco per le date ``start``–``end`` (incluse), senza paginare.
+
+    La paginazione del sito non è affidabile (righe con la stessa data finiscono su
+    più pagine o su nessuna). Una pagina non piena è completa; una piena si divide a
+    metà finché ogni finestra ci sta. Un solo giorno ancora pieno: si leggono le
+    pagine successive (caso raro, al meglio).
+    """
+    query = {**params, "data_inizio": start.isoformat(), "data_fine": end.isoformat()}
+    resp = client.get(url, params=query)
+    resp.raise_for_status()
+    if len(cgsse_ids(resp.text)) < _CGSSE_PAGE_SIZE:
+        return [resp.text]
+    if start < end:
+        mid = start + (end - start) // 2
+        return _cgsse_window(client, url, params, start, mid) + _cgsse_window(
+            client, url, params, mid + dt.timedelta(days=1), end
+        )
+    pages = [resp.text]
+    for n in range(1, _CGSSE_MAX_PAGES):
+        resp = client.get(url, params={**query, "page": str(n)})
+        resp.raise_for_status()
+        pages.append(resp.text)
+        if len(cgsse_ids(resp.text)) < _CGSSE_PAGE_SIZE:
+            break
+    return pages
+
+
+def download_strikes(settings: Settings | None = None) -> str:
+    """Scarica il calendario CGSSE dei prossimi mesi (rete): JSON degli scioperi."""
     settings = settings or get_settings()
-    resp = httpx.get(
-        settings.strikes_rss_url,
+    today = clock.today()
+    start = today - dt.timedelta(days=_GRACE_DAYS)
+    end = today + dt.timedelta(days=_CGSSE_DAYS)
+    params = {"settore[]": list(_CGSSE_SECTORS)}
+    with httpx.Client(
         timeout=settings.http_timeout,
         follow_redirects=True,
         headers={"User-Agent": "Mozilla/5.0 (compatible; Anduma/1.0)"},
+    ) as client:
+        listing = "".join(_cgsse_window(client, settings.strikes_url, params, start, end))
+        revoked_pages = _cgsse_window(
+            client, settings.strikes_url, {**params, "revocato": "1"}, start, end
+        )
+    revoked = {sid for page in revoked_pages for sid in cgsse_ids(page)}
+    if 'name="data_inizio"' not in listing:  # non è la pagina del calendario
+        raise ValueError("Calendario CGSSE non riconosciuto: formato cambiato?")
+    strikes = sorted(
+        parse_cgsse(listing, revoked), key=lambda x: parse_date(x.start_date) or dt.date.max
     )
-    resp.raise_for_status()
-    return resp.text
+    return json.dumps([s.model_dump() for s in strikes], ensure_ascii=False)
+
+
+def parse_strikes(text: str) -> list[Strike]:
+    """Scioperi dal contenuto scaricato: JSON (CGSSE) o feed RSS MIT."""
+    stripped = text.lstrip("\ufeff").strip()
+    if stripped.startswith("["):
+        try:
+            return [Strike(**item) for item in json.loads(stripped)]
+        except (ValueError, TypeError):
+            return []
+    return parse_strikes_rss(stripped)
 
 
 __all__ = [
+    "download_strikes",
+    "parse_cgsse",
+    "parse_strikes",
     "parse_strikes_rss",
     "is_relevant_for_torino",
     "filter_for_torino",
     "is_active_strike",
     "parse_date",
     "filter_upcoming",
-    "download_strikes_rss",
 ]

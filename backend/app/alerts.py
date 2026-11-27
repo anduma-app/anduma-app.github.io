@@ -37,13 +37,13 @@ from .gtfs_static import GtfsStatic
 from .mato import stop_arrivals
 from .models import Arrival, Strike
 from .realtime import alert_entities, parse_feed
-from .scioperi import filter_for_torino, filter_upcoming, parse_date, parse_strikes_rss
+from .scioperi import filter_for_torino, filter_upcoming, parse_date, parse_strikes
 
 log = logging.getLogger(__name__)
 
 # Buffer oltre l'ETA stimato prima che la dedup scada (il mezzo è passato).
 _IMMINENT_TTL_BUFFER_S = 120
-# Uno sciopero non si rinotifica finché non è passato (date assenti: orizzonte MIT).
+# Uno sciopero non si rinotifica finché non è passato (date assenti: orizzonte massimo).
 _STRIKE_TTL_GRACE_DAYS = 2
 _STRIKE_TTL_FALLBACK_DAYS = 400
 # Avvisi di servizio: ri-notifica al più una volta a settimana se ancora attivi.
@@ -191,7 +191,7 @@ def evaluate_imminent(
 
 # --------------------------------------------------------------------- strike
 def strike_key(strike: Strike) -> str:
-    """Identità stabile di uno sciopero (per la deduplica): il guid MIT se c'è."""
+    """Identità stabile di uno sciopero (per la deduplica): il guid della fonte se c'è."""
     base = strike.raw.get("guid") or "|".join(
         [
             strike.start_date or "",
@@ -321,9 +321,9 @@ def run_imminent(provider, dispatcher: Dispatcher, session_factory: sessionmaker
 
 
 def run_strikes(provider, dispatcher: Dispatcher, session_factory: sessionmaker[Session]) -> int:
-    """Job strike: legge il registro MIT dal provider e valuta (tollerante a errori)."""
+    """Job strike: legge il calendario scioperi dal provider e valuta (tollerante a errori)."""
     try:
-        strikes = filter_upcoming(filter_for_torino(parse_strikes_rss(provider.strikes_feed())))
+        strikes = filter_upcoming(filter_for_torino(parse_strikes(provider.strikes_feed())))
     except Exception:
         log.warning("Job strike: registro scioperi non disponibile", exc_info=True)
         return 0

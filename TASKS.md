@@ -29,6 +29,7 @@ Backend
 - [x] P1 Previsioni assenti oltre le ~7 fermate pubblicate da GTT → ritardo propagato (GTFS-RT).
 - [x] P1 Test con rete reale nel lifespan; test dipendente dalla data.
 - [x] P1 Refresh GTFS/scioperi con lock e backoff; ultimo dato valido se la sorgente è giù.
+- [x] P0 Scioperi dal calendario CGSSE: il sito MIT non risponde ai server in datacenter (27/11/2026).
 - [x] P1 Coda push illimitata con FCM spento; dedup senza vincolo né pulizia; push doppie per device.
 - [x] P1 `/me/*` enumerabile → segreto per device; aggiornamento token FCM; prefisso `/v1`.
 - [x] P1 Logging, `/health` con stato `degraded`; worker separato; Dockerfile, `uv.lock`, `apscheduler<4`.

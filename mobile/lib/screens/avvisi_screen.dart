@@ -1,4 +1,4 @@
-// Schermata Avvisi: avvisi di servizio GTT + scioperi MIT.
+// Schermata Avvisi: avvisi di servizio GTT + scioperi (CGSSE).
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 

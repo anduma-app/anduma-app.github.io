@@ -25,7 +25,7 @@ Esiti e rischi per fase in [`ROADMAP.md`](ROADMAP.md); lavoro aperto della fase 
 ## Architettura
 
 ```
-Open data (GTFS statico + GTFS-RT GTT + registro scioperi MIT)
+Open data (GTFS statico + GTFS-RT GTT + calendario scioperi CGSSE)
         │
         ▼
 Backend Python (FastAPI)  ── polling centralizzato + cache TTL ──┐
@@ -101,7 +101,7 @@ non negoziabili del progetto.
 
 - **Feed GTT** (GTFS statico + Realtime): **CC BY 4.0** → credito *"Città di Torino / GTT"*.
 - **Arrivi in tempo reale**: **5T / Muoversi a Torino** (dati aperti, art. 52 CAD) → credito *"5T / Muoversi a Torino"*.
-- **Scioperi**: dati **MIT — Osservatorio sui Conflitti Sindacali**.
+- **Scioperi**: calendario della **Commissione di Garanzia Sciopero (CGSSE)**.
 - **Mappa**: tile **OpenStreetMap** → *"© OpenStreetMap contributors"*.
 
 Tutte le sorgenti, con formati e trappole note, sono documentate in

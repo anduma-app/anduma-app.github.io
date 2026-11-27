@@ -42,7 +42,7 @@ from .provider import DataProvider, LiveProvider
 from .worker import configure_logging, create_scheduler
 from .ws import ConnectionManager
 
-ATTRIBUTION = "Dati: Città di Torino / GTT (CC BY 4.0); scioperi MIT; mappa © OpenStreetMap"
+ATTRIBUTION = "Dati: Città di Torino / GTT (CC BY 4.0); scioperi CGSSE; mappa © OpenStreetMap"
 
 
 @asynccontextmanager
@@ -233,7 +233,7 @@ def alerts(
 ) -> AlertsResponse:
     gtfs = provider.gtfs()
     strikes = scioperi.filter_upcoming(
-        scioperi.filter_for_torino(scioperi.parse_strikes_rss(provider.strikes_feed()))
+        scioperi.filter_for_torino(scioperi.parse_strikes(provider.strikes_feed()))
     )
     try:
         feed = realtime.parse_feed(provider.alerts_bytes())

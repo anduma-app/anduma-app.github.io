@@ -20,7 +20,7 @@ from .config import Settings, get_settings
 from .gtfs_static import GtfsStatic, download_zip_bytes
 from .mato import stoptimes_request
 from .realtime import FeedFetcher
-from .scioperi import download_strikes_rss
+from .scioperi import download_strikes
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class LiveProvider:
         self,
         settings: Settings | None = None,
         gtfs_downloader: Callable[[Settings], bytes] = download_zip_bytes,
-        strikes_downloader: Callable[[Settings], str] = download_strikes_rss,
+        strikes_downloader: Callable[[Settings], str] = download_strikes,
     ):
         self._settings = settings or get_settings()
         self._cache: Cache = get_cache(self._settings)
@@ -128,7 +128,7 @@ class LiveProvider:
     def strikes_feed(self) -> str:
         """Ultimo registro scioperi; se è da aggiornare lo scarica in background.
 
-        Il sito MIT può non rispondere affatto (timeout): nessuna richiesta deve
+        Il sito degli scioperi può non rispondere affatto (timeout): nessuna richiesta deve
         aspettarlo, quindi si serve sempre lo snapshot corrente.
         """
         if time.time() >= self._strikes_next_download and self._strikes_lock.acquire(

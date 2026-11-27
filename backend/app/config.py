@@ -38,9 +38,10 @@ class Settings(BaseSettings):
     # GraphQL di OpenTripPlanner usato da muoversiatorino.it (non documentato).
     mato_graphql_url: str = "https://mapi.5t.torino.it/routing/v1/routers/mat/index/graphql"
 
-    # --- Scioperi (MIT, Osservatorio sui Conflitti Sindacali) ---
-    # Feed RSS degli scioperi in programma. Il CSV su dati.mit.gov.it è fermo al 2020.
-    strikes_rss_url: str = "https://scioperi.mit.gov.it/mit2/public/scioperi/rss"
+    # --- Scioperi: calendario della Commissione di Garanzia Sciopero (CGSSE) ---
+    # Elenco HTML paginato. Il feed RSS MIT ha gli stessi dati ma non risponde ai
+    # server in datacenter (vedi docs/DATA_SOURCES.md).
+    strikes_url: str = "https://cgsse.it/calendario-scioperi"
 
     # --- TTL cache (secondi) ---
     ttl_vehicle_positions: int = 12

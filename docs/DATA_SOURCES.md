@@ -81,27 +81,41 @@ trip update resta come ripiego se MATO non risponde o non conosce la fermata.
   `/<linea>/<mezzo>`, array `[lat, lon, direzione, velocità, corsa, verso, prossima_fermata, pieno]`,
   ~6 s) e mezzi in sharing dal secondo OTP `https://plan.muoversiatorino.it/otp/routers/mato/`.
 
-## Scioperi (MIT)
+## Scioperi (CGSSE, MIT)
 
-- Osservatorio sui Conflitti Sindacali del MIT — fonte ufficiale, preavviso ≥ 10 giorni per legge.
-- **Feed usato**: RSS degli scioperi in programma, aggiornato ogni giorno:
-  https://scioperi.mit.gov.it/mit2/public/scioperi/rss
-  - Ogni `<item>`: titolo `Data inizio: … - Settore: … - Rilevanza: … - Regione: … - Provincia: …`,
-    descrizione con righe `Chiave: valore` separate da `<br/>` (data fine, sindacati, categoria,
-    modalità), `guid` stabile (usato per la deduplica delle push).
-  - Date in formato `DD/MM/YYYY`.
-- **Trappola**: il CSV su dati.mit.gov.it (`…/scioperi-dei-trasporti/…/scioperi.csv`) è fermo
-  a settembre 2020. Non usarlo.
-- **Trappola**: chiavi e formato possono cambiare. Il parser riconosce le chiavi in modo
-  case-insensitive per prefisso ed è coperto da una fixture nel formato reale.
-- Consultazione umana: http://scioperi.mit.gov.it/mit2/public/scioperi
-- Rilevanza per GTT: settore Trasporto pubblico locale, Generale o Plurisettoriale, se nazionale con
-  regione "Italia" o in Piemonte/Torino; in Piemonte anche il Ferroviario (GTT gestisce la Torino-Ceres).
-  Esclusi aereo, marittimo, merci, scioperi di altre regioni e "nazionali" registrati su un'altra regione.
-- **Trappola**: il sito MIT non risponde (timeout) ai server in datacenter: né da Render
-  (Francoforte) né da GitHub Actions (USA), verificato il 27/11/2026; da una rete domestica
-  italiana sì. In produzione quindi niente scioperi finché non si trova un'altra via. Il download
-  gira solo in background, così le richieste non aspettano il timeout.
+- **Fonte usata**: calendario della Commissione di Garanzia Sciopero (CGSSE), elenco HTML:
+  https://cgsse.it/calendario-scioperi?data_inizio=AAAA-MM-GG&data_fine=AAAA-MM-GG&page=N
+  (host senza `www`: il certificato vale solo per `cgsse.it`). Stessi scioperi del MIT, con lo
+  sciopero multisettoriale diviso per settore.
+  - Ogni riga: Data (`GG-MM-AAAA` o `Dal … al …`), Settore, Azienda, Sindacato, Ambito geografico
+    (vuoto = nazionale), Modalità, link `…/dettaglio-sciopero/<id>` (l'URL fa da `guid`).
+  - Filtro `settore[]` (id della tassonomia): 112 TPL (include gli scioperi multisettore con il
+    TPL), 110 ferroviario, 382/384/386 generale nazionale/provinciale/regionale, 376/378
+    plurisettoriale provinciale/regionale. 108 è l'aereo, 114 il marittimo.
+  - **Trappola**: la paginazione (`page=N`, 15 righe) non è affidabile: le righe con la stessa
+    data si spostano tra le pagine, così alcune compaiono due volte e altre mai; oltre l'ultima
+    pagina il sito ne ripete una a caso. Non si pagina: una pagina non piena è completa, una
+    piena si rilegge dividendo a metà l'intervallo di date (~4 richieste per download).
+  - **Trappola**: il campo di ricerca libera `keys` viene ignorato.
+  - **Trappola**: l'elenco include gli scioperi revocati senza segnarli. Si legge anche l'elenco
+    con `revocato=1` e se ne escludono gli id.
+  - Download ogni ora in background, 120 giorni avanti; il backend salva gli scioperi già
+    normalizzati.
+  - Licenza: nessuna esplicita; autorità pubblica → dati aperti per l'art. 52 c. 2 del CAD (come 5T):
+    credito "Commissione di Garanzia Sciopero (CGSSE)".
+  - **Trappola**: è un'interfaccia per persone, non un'API: se cambia l'HTML il parser restituisce
+    zero righe e il download fallisce (si tiene l'ultimo dato valido).
+- **MIT** (Osservatorio sui Conflitti Sindacali), feed RSS
+  https://scioperi.mit.gov.it/mit2/public/scioperi/rss: stessi dati e formato più comodo, ma il sito
+  non risponde (timeout) ai server in datacenter, né da Render (Francoforte) né da GitHub Actions
+  o da servizi proxy pubblici; da una rete domestica italiana sì (verificato il 27/11/2026). Non manda
+  header CORS, quindi neanche la web app può leggerlo. Il parser RSS resta (`parse_strikes` legge
+  entrambi i formati) per le fixture e per chi ospita il backend in Italia.
+  - Il CSV su dati.mit.gov.it è fermo al 2020. Non usarlo.
+- Rilevanza per GTT: settore Trasporto pubblico locale, Generale o Plurisettoriale, se nazionale o
+  in Piemonte/Torino; in Piemonte/Torino anche il Ferroviario (GTT gestisce la Torino-Ceres).
+  Esclusi aereo, marittimo, merci e scioperi di altre zone.
+- Il download non blocca mai le richieste: si serve l'ultimo dato valido.
 - **Trappola**: il feed alerts GTT può restare in errore 500 per ore (pagina "Runtime Error" ASP.NET,
   vista il 27/10/2026): è un guasto lato GTT, l'app lo segnala e mostra comunque gli scioperi.
 
@@ -109,6 +123,6 @@ trip update resta come ripiego se MATO non risponde o non conosce la fermata.
 
 - Feed GTT (statico + RT): **CC BY 4.0** → credito "Città di Torino / GTT".
 - Arrivi in tempo reale: **5T / Muoversi a Torino** (art. 52 CAD, CC BY 4.0).
-- Scioperi: dati **MIT — Osservatorio sui Conflitti Sindacali**.
+- Scioperi: calendario della **Commissione di Garanzia Sciopero (CGSSE)**.
 - Mappa: tile **OpenStreetMap** → credito "© OpenStreetMap contributors".
 Inserire tutti i crediti in una schermata "Informazioni / Fonti dati" dell'app.
