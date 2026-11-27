@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 
 import httpx
 from fastapi import HTTPException
@@ -293,18 +296,33 @@ class FeedFetcher:
             headers={"User-Agent": "Mozilla/5.0 (compatible; Anduma/1.0)"},
         )
         self._cache: Cache = cache or InMemoryCache()
+        self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="feed-rt")
+        self._inflight: dict[str, Future] = {}
+        self._lock = threading.Lock()
 
     def _get(self, key: str, url: str, ttl: int) -> bytes:
         hit = self._cache.get(f"rt:{key}")
         if hit is not None:
             return hit
+        # Un solo download per feed alla volta, condiviso tra le richieste.
+        with self._lock:
+            fut = self._inflight.get(key)
+            if fut is None:
+                fut = self._pool.submit(self._download, key, url, ttl)
+                self._inflight[key] = fut
+                fut.add_done_callback(lambda f, k=key: self._forget(k, f))
+        # Con un payload valido in cache non si fa aspettare il client oltre
+        # ``rt_stale_wait_s``: se GTT è lento si serve quello e il download finisce
+        # in background (il prossimo giro trova il dato fresco).
+        stale = self._cache.get(f"rt:{key}:last")
         try:
-            resp = self._client.get(url, follow_redirects=True)
-            resp.raise_for_status()
+            return fut.result(timeout=None if stale is None else self._settings.rt_stale_wait_s)
+        except FutureTimeout:
+            log.warning("Feed RT %s lento, uso l'ultimo valido", key)
+            return stale  # type: ignore[return-value]
         except (httpx.TransportError, httpx.HTTPStatusError) as exc:
             # Sorgente giù (GTT a volte risponde 500): meglio dati di qualche
             # minuto fa che nessun dato. Si ritenta al giro successivo.
-            stale = self._cache.get(f"rt:{key}:last")
             if stale is not None:
                 log.warning("Feed RT %s non raggiungibile, uso l'ultimo valido: %s", key, exc)
                 return stale
@@ -312,9 +330,17 @@ class FeedFetcher:
                 status_code=503,
                 detail=f"Feed RT non raggiungibile: {exc}",
             ) from exc
+
+    def _download(self, key: str, url: str, ttl: int) -> bytes:
+        resp = self._client.get(url, follow_redirects=True)
+        resp.raise_for_status()
         self._cache.set(f"rt:{key}", resp.content, ttl)
         self._cache.set(f"rt:{key}:last", resp.content, _STALE_TTL_S)
         return resp.content
+
+    def _forget(self, key: str, fut: Future) -> None:
+        if self._inflight.get(key) is fut:
+            del self._inflight[key]
 
     def post_json(self, key: str, url: str, body: dict, ttl: int) -> bytes:
         """POST JSON con cache TTL e senza ripiego su dati vecchi: gli errori di rete
@@ -340,6 +366,7 @@ class FeedFetcher:
         return self._get("alerts", s.rt_alerts_url, s.ttl_alerts)
 
     def close(self) -> None:
+        self._pool.shutdown(wait=False, cancel_futures=True)
         self._client.close()
 
 

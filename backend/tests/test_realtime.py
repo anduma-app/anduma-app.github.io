@@ -226,3 +226,41 @@ def test_fetcher_serves_last_good_payload_when_source_fails():
     with pytest.raises(Exception) as exc:
         empty.alerts()
     assert getattr(exc.value, "status_code", None) == 503
+
+
+def test_fetcher_does_not_wait_for_slow_source_when_last_good_exists():
+    import threading
+    import time
+
+    import httpx
+
+    from app.cache import InMemoryCache
+    from app.config import Settings
+
+    release = threading.Event()
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            release.wait(5)  # GTT lento
+            return httpx.Response(200, content=b"new")
+        return httpx.Response(200, content=b"old")
+
+    fetcher = realtime.FeedFetcher(
+        Settings(ttl_alerts=0, rt_stale_wait_s=0.05),
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        cache=InMemoryCache(),
+    )
+    assert fetcher.alerts() == b"old"
+    t0 = time.monotonic()
+    assert fetcher.alerts() == b"old"  # ultimo valido, senza aspettare GTT
+    assert fetcher.alerts() == b"old"  # download già in corso: nessuna nuova richiesta
+    assert time.monotonic() - t0 < 1
+    assert calls["n"] == 2
+    release.set()
+    deadline = time.monotonic() + 5
+    while fetcher._inflight and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert fetcher.alerts() == b"new"  # download finito: dato fresco
+    fetcher.close()

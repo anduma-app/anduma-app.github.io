@@ -52,6 +52,9 @@ class Settings(BaseSettings):
 
     # --- HTTP ---
     http_timeout: float = 15.0
+    # Attesa massima di un feed RT lento quando c'è già un dato valido da servire
+    # (resta sotto il timeout del client, 12 s).
+    rt_stale_wait_s: float = 3.0
     # Attesa prima di ritentare un download GTFS/scioperi fallito (si serve lo snapshot precedente).
     retry_backoff_s: int = 300
 
