@@ -1,6 +1,6 @@
 # Web app (build Flutter web del client) pubblicata su GitHub Pages:
-#   https://emanueledri.github.io/anduma/  oppure, col dominio personalizzato, https://anduma.is-a.dev/
-# Il base href viene da configure-pages: "/anduma/" senza dominio, "/" con il dominio.
+#   https://anduma-app.github.io/ (repo anduma-app/anduma-app.github.io, sito d'organizzazione)
+# Il base href viene da configure-pages: "/" per un sito d'organizzazione.
 # Parla con il backend su Render; le origini sono ammesse via TT_CORS_ORIGINS (render.yaml).
 name: Web app
 

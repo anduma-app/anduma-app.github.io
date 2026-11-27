@@ -32,10 +32,10 @@ services:
         value: "8000"
       # Web app su GitHub Pages (.github/workflows/web.yml).
       - key: TT_CORS_ORIGINS
-        value: https://emanueledri.github.io,https://anduma.is-a.dev
+        value: https://anduma-app.github.io
       # Feedback → issue su questo repo.
       - key: TT_GITHUB_REPO
-        value: emanueledri/anduma
+        value: anduma-app/anduma-app.github.io
       # Davanti a Render c'è Cloudflare: IP reale del client per l'anti-spam del feedback.
       - key: TT_CLIENT_IP_HEADER
         value: cf-connecting-ip

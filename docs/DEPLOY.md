@@ -64,7 +64,7 @@ flutter build appbundle --dart-define=TT_API_BASE=https://transito-torino.onrend
 
 Il workflow [`.github/workflows/web.yml`](../.github/workflows/web.yml) compila il client
 Flutter per il web e lo pubblica su GitHub Pages a ogni push su `main` che tocca `mobile/`:
-<https://emanueledri.github.io/anduma/>. Il backend ammette quell'origine con
+<https://anduma-app.github.io/>. Il backend ammette quell'origine con
 `TT_CORS_ORIGINS` (impostata in `render.yaml`).
 
 Da smartphone: apri il link e usa "Aggiungi a schermata Home". I preferiti restano salvati nel
@@ -76,15 +76,14 @@ pubblici), chiave VAPID dai "Certificati push web" di Cloud Messaging. Il browse
 come device `web`. Su iPhone funzionano solo con la web app aggiunta alla schermata Home
 (iOS 16.4+).
 
-### 5b. Dominio anduma.is-a.dev (opzionale)
+### 5b. Indirizzo anduma-app.github.io
 
-Sottodominio gratuito di [is-a.dev](https://docs.is-a.dev/guides/github-pages/): una pull
-request su `is-a-dev/register` con il file `domains/anduma.json` (owner = account GitHub,
-record `CNAME` = `emanueledri.github.io`). Solo **dopo** il merge: repo `anduma` →
-Settings → Pages → Custom domain `anduma.is-a.dev` → Save, poi "Enforce HTTPS", e rilancio
-del workflow "Web app". Il base href si adegua da solo (`actions/configure-pages`: `/anduma/`
-senza dominio, `/` con il dominio); `TT_CORS_ORIGINS` ammette già `https://anduma.is-a.dev`.
-Il vecchio indirizzo `emanueledri.github.io/anduma/` reindirizza al dominio.
+Il repo appartiene all'organizzazione GitHub gratuita `anduma-app` e si chiama
+`anduma-app.github.io`: è il sito d'organizzazione, servito alla radice
+(`actions/configure-pages` restituisce base href `/`). Repo → Settings → Pages → Source
+**GitHub Actions**. Se repo o organizzazione cambiano nome vanno aggiornati
+`TT_CORS_ORIGINS` e `TT_GITHUB_REPO` (in `render.yaml` e, se impostati a mano, su Render).
+Un nome di repo diverso da `<org>.github.io` sposta il sito su `/<repo>/`.
 
 ### 6. Feedback come issue GitHub (opzionale)
 
@@ -98,7 +97,8 @@ non creata"). Anti-spam: `TT_FEEDBACK_MAX_PER_MINUTE` invii al minuto per IP (de
 con l'IP letto da `CF-Connecting-IP` (`TT_CLIENT_IP_HEADER`).
 
 Token: GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained
-tokens** → Generate new token. Repository access: **Only select repositories** → `anduma`.
+tokens** → Generate new token. Resource owner: **anduma-app**. Repository access: **Only select repositories** →
+`anduma-app.github.io`.
 Repository permissions: **Issues: Read and write** (Metadata in sola lettura si aggiunge da
 solo). Su Render: servizio `transito-torino` → **Environment** → aggiungi `TT_GITHUB_TOKEN`
 → **Save, rebuild, and deploy**. Alla scadenza del token va rigenerato e sostituito.

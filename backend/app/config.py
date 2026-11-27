@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     # Senza token il feedback resta solo nel DB. Token fine-grained con permesso
     # Issues in lettura e scrittura sul solo repo indicato (vedi docs/DEPLOY.md).
     github_token: str = ""
-    github_repo: str = "emanueledri/anduma"
+    github_repo: str = "anduma-app/anduma-app.github.io"
     # Anti-spam: invii di feedback ammessi per indirizzo IP al minuto.
     feedback_max_per_minute: int = 3
     # Header con l'IP reale del client dietro un proxy fidato. Su Render c'è
