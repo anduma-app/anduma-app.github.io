@@ -55,8 +55,9 @@ class InfoScreen extends StatelessWidget {
           Text(
             'Anduma, in piemontese «andiamo»: ti dice quando passa il prossimo bus, tram o '
             'metro a Torino, così sai quando è ora di andare. Usa i dati aperti ufficiali della '
-            'Città di Torino e di GTT, che il nostro server aggiorna in continuazione. I tempi '
-            'di arrivo sono stime GTT e possono differire da quelli reali.',
+            'Città di Torino, di GTT e di 5T, che il nostro server aggiorna in continuazione. I '
+            'tempi di arrivo sono stime di 5T (Muoversi a Torino) e possono differire da quelli '
+            'reali.',
             style: TextStyle(fontSize: 14, color: c.ink, height: 1.5),
           ),
           const SizedBox(height: TTSpace.x6),
@@ -92,6 +93,7 @@ class InfoScreen extends StatelessWidget {
           sectionLabel('FONTI DATI'),
           credit(Icons.directions_transit, 'Trasporto pubblico',
               'Città di Torino / GTT — licenza CC BY 4.0'),
+          credit(Icons.schedule, 'Arrivi in tempo reale', '5T / Muoversi a Torino'),
           credit(Icons.warning_amber_rounded, 'Scioperi',
               'MIT — Osservatorio sui Conflitti Sindacali'),
           credit(Icons.map_outlined, 'Mappa', '© OpenStreetMap contributors'),
