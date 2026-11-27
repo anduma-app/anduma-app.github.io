@@ -56,9 +56,21 @@ trip update resta come ripiego se MATO non risponde o non conosce la fermata.
   realtimeArrival serviceDay trip { gtfsId tripHeadsign route { shortName } } } }`.
   L'id è la **palina** (`stop_code`), non lo `stop_id` GTFS. Arrivo = `serviceDay + realtimeArrival`.
   `gtfsId` = `gtt:` + `trip_id` GTT. Si tengono solo `realtime: true` non `CANCELED`.
-- Perché: 5T calcola le previsioni con un proprio sistema dalle posizioni dei mezzi. Misura del
-  27/11/2026 (10 min, 14 fermate, passaggi reali dallo stream MQTT di 5T): a 5–10 min errore
-  mediano 1 min contro 3,5 min del feed GTT, che oltre le prime fermate propaga l'ultimo ritardo.
+- Perché: 5T calcola le previsioni con un proprio sistema dalle posizioni dei mezzi; il feed GTT
+  oltre le prime fermate propaga l'ultimo ritardo e l'errore cresce con l'anticipo. Misura del
+  27/11/2026 (15:58–16:29, 14 fermate, passaggi reali dallo stream MQTT di 5T, quota di
+  previsioni con errore entro 2 min):
+
+  | Anticipo  | Feed GTT | MATO |
+  |-----------|----------|------|
+  | 0–5 min   | 60%      | 63%  |
+  | 5–10 min  | 29%      | 57%  |
+  | 10–20 min | 19%      | 43%  |
+  | 20–60 min | 24%      | 22%  |
+
+  Errore mediano a 10–20 min: −4,5 min GTT, −1,2 min MATO (negativo = previsto prima del
+  passaggio). Tutti gli errori sono spostati di 1–2 min in negativo anche per il ritardo con cui
+  il metodo rileva la partenza: conta il confronto tra le fonti più dei valori assoluti.
 - Licenza: pubblicato da 5T (società in house del Comune) senza licenza esplicita → dati aperti
   per l'art. 52 c. 2 del CAD, che le linee guida AgID equiparano a **CC BY 4.0**: credito
   "5T / Muoversi a Torino".
@@ -86,6 +98,10 @@ trip update resta come ripiego se MATO non risponde o non conosce la fermata.
 - Rilevanza per GTT: settore Trasporto pubblico locale, Generale o Plurisettoriale, se nazionale con
   regione "Italia" o in Piemonte/Torino; in Piemonte anche il Ferroviario (GTT gestisce la Torino-Ceres).
   Esclusi aereo, marittimo, merci, scioperi di altre regioni e "nazionali" registrati su un'altra regione.
+- **Trappola**: il sito MIT non risponde (timeout) ai server in datacenter: né da Render
+  (Francoforte) né da GitHub Actions (USA), verificato il 27/11/2026; da una rete domestica
+  italiana sì. In produzione quindi niente scioperi finché non si trova un'altra via. Il download
+  gira solo in background, così le richieste non aspettano il timeout.
 - **Trappola**: il feed alerts GTT può restare in errore 500 per ore (pagina "Runtime Error" ASP.NET,
   vista il 27/10/2026): è un guasto lato GTT, l'app lo segnala e mostra comunque gli scioperi.
 
