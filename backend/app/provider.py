@@ -18,6 +18,7 @@ from . import clock
 from .cache import Cache, get_cache
 from .config import Settings, get_settings
 from .gtfs_static import GtfsStatic, download_zip_bytes
+from .mato import stoptimes_request
 from .realtime import FeedFetcher
 from .scioperi import download_strikes_rss
 
@@ -29,6 +30,7 @@ class DataProvider(Protocol):
     def vehicle_positions_bytes(self) -> bytes: ...
     def trip_updates_bytes(self) -> bytes: ...
     def alerts_bytes(self) -> bytes: ...
+    def mato_stoptimes(self, stop_code: str) -> bytes: ...
     def strikes_feed(self) -> str: ...
 
 
@@ -111,6 +113,15 @@ class LiveProvider:
 
     def alerts_bytes(self) -> bytes:
         return self._fetcher.alerts()
+
+    def mato_stoptimes(self, stop_code: str) -> bytes:
+        s = self._settings
+        return self._fetcher.post_json(
+            f"mato:{stop_code}",
+            s.mato_graphql_url,
+            stoptimes_request(stop_code),
+            s.ttl_mato_arrivals,
+        )
 
     # -------------------------------------------------------------- scioperi
     def strikes_feed(self) -> str:

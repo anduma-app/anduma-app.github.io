@@ -34,8 +34,9 @@ from .clock import ROME
 from .config import Settings, get_settings
 from .db import NotifiedEvent, Subscription
 from .gtfs_static import GtfsStatic
-from .models import Strike
-from .realtime import alert_entities, arrivals_for_stop, parse_feed
+from .mato import stop_arrivals
+from .models import Arrival, Strike
+from .realtime import alert_entities, parse_feed
 from .scioperi import filter_for_torino, filter_upcoming, parse_date, parse_strikes_rss
 
 log = logging.getLogger(__name__)
@@ -132,14 +133,17 @@ def _already_notified(
 
 
 # ------------------------------------------------------------------- imminent
+# (stop_id, linea, istante) -> arrivi previsti alla fermata.
+ArrivalsFn = Callable[[str, str | None, float], list[Arrival]]
+
+
 def evaluate_imminent(
     session: Session,
-    feed: gtfs_realtime_pb2.FeedMessage,
-    gtfs: GtfsStatic,
+    arrivals_fn: ArrivalsFn,
     dispatcher: Dispatcher,
     now: float | None = None,
 ) -> int:
-    """Valuta le sottoscrizioni ``imminent`` sul feed dato. Ritorna gli accodati."""
+    """Valuta le sottoscrizioni ``imminent`` sugli arrivi dati. Ritorna gli accodati."""
     now_ts = now if now is not None else time.time()
     now_dt = _now_dt(now_ts)
     _purge_expired(session, now_dt)
@@ -151,7 +155,7 @@ def evaluate_imminent(
     for sub in subs:
         if not sub.stop_id:
             continue
-        arrivals = arrivals_for_stop(feed, gtfs, sub.stop_id, line=sub.line, now=now_ts)
+        arrivals = arrivals_fn(sub.stop_id, sub.line, now_ts)
         for arr in arrivals:
             if arr.trip_id is None:
                 continue
@@ -303,15 +307,17 @@ def evaluate_service_alerts(
 
 # ----------------------------------------------------------- scheduler wiring
 def run_imminent(provider, dispatcher: Dispatcher, session_factory: sessionmaker[Session]) -> int:
-    """Job imminent: legge i trip update dal provider e valuta (tollerante a errori)."""
-    try:
-        feed = parse_feed(provider.trip_updates_bytes())
-        gtfs = provider.gtfs()
-    except Exception:
-        log.warning("Job imminent: sorgenti non disponibili, salto il giro", exc_info=True)
-        return 0
+    """Job imminent: arrivi da MATO (ripiego GTT) e valutazione (tollerante a errori)."""
+
+    def arrivals_fn(stop_id: str, line: str | None, now: float) -> list[Arrival]:
+        try:
+            return stop_arrivals(provider, stop_id, line=line, now=now)
+        except Exception:
+            log.warning("Job imminent: arrivi non disponibili per %s", stop_id, exc_info=True)
+            return []
+
     with session_factory() as session:
-        return evaluate_imminent(session, feed, gtfs, dispatcher)
+        return evaluate_imminent(session, arrivals_fn, dispatcher)
 
 
 def run_strikes(provider, dispatcher: Dispatcher, session_factory: sessionmaker[Session]) -> int:

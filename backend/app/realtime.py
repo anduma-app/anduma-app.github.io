@@ -316,6 +316,17 @@ class FeedFetcher:
         self._cache.set(f"rt:{key}:last", resp.content, _STALE_TTL_S)
         return resp.content
 
+    def post_json(self, key: str, url: str, body: dict, ttl: int) -> bytes:
+        """POST JSON con cache TTL e senza ripiego su dati vecchi: gli errori di rete
+        risalgono al chiamante, che decide la fonte alternativa."""
+        hit = self._cache.get(f"rt:{key}")
+        if hit is not None:
+            return hit
+        resp = self._client.post(url, json=body)
+        resp.raise_for_status()
+        self._cache.set(f"rt:{key}", resp.content, ttl)
+        return resp.content
+
     def vehicle_positions(self) -> bytes:
         s = self._settings
         return self._get("vehicles", s.rt_vehicle_positions_url, s.ttl_vehicle_positions)

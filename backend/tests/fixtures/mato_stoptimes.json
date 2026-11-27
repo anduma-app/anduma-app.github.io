@@ -1,0 +1,14 @@
+{"data": {"stop": {"stoptimesWithoutPatterns": [
+  {"realtime": true, "realtimeState": "UPDATED", "realtimeArrival": 3900, "serviceDay": 1893452400,
+   "trip": {"gtfsId": "gtt:T1", "tripHeadsign": "CORSO SETTEMBRINI", "route": {"shortName": "10"}}},
+  {"realtime": true, "realtimeState": "UPDATED", "realtimeArrival": 3660, "serviceDay": 1893452400,
+   "trip": {"gtfsId": "gtt:T3", "tripHeadsign": "LINGOTTO", "route": {"shortName": "55"}}},
+  {"realtime": false, "realtimeState": "SCHEDULED", "realtimeArrival": 3700, "serviceDay": 1893452400,
+   "trip": {"gtfsId": "gtt:T2", "tripHeadsign": "PIAZZA HERMADA", "route": {"shortName": "10"}}},
+  {"realtime": true, "realtimeState": "CANCELED", "realtimeArrival": 3800, "serviceDay": 1893452400,
+   "trip": {"gtfsId": "gtt:X1", "tripHeadsign": "SOPPRESSA", "route": {"shortName": "10"}}},
+  {"realtime": true, "realtimeState": "UPDATED", "realtimeArrival": 3540, "serviceDay": 1893452400,
+   "trip": {"gtfsId": "gtt:X2", "tripHeadsign": "GIA PASSATA", "route": {"shortName": "55"}}},
+  {"realtime": true, "realtimeState": "UPDATED", "realtimeArrival": 4200, "serviceDay": 1893452400,
+   "trip": {"gtfsId": "gtt:9999U", "tripHeadsign": "FALCHERA", "route": {"shortName": "4"}}}
+]}}}

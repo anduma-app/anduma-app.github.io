@@ -100,6 +100,7 @@ non negoziabili del progetto.
 ## Dati e licenze
 
 - **Feed GTT** (GTFS statico + Realtime): **CC BY 4.0** → credito *"Città di Torino / GTT"*.
+- **Arrivi in tempo reale**: **5T / Muoversi a Torino** (dati aperti, art. 52 CAD) → credito *"5T / Muoversi a Torino"*.
 - **Scioperi**: dati **MIT — Osservatorio sui Conflitti Sindacali**.
 - **Mappa**: tile **OpenStreetMap** → *"© OpenStreetMap contributors"*.
 

@@ -50,8 +50,9 @@ Ricerca fermate. → `[{ "stop_id", "code", "name", "desc", "lat", "lon", "lines
 (`desc` = via + comune, `lines` = linee della palina: distinguono le fermate omonime).
 
 ### `GET /stops/{stop_id}/arrivals?line={opt}`
-Passaggi previsti in tempo reale (dai trip update GTFS-RT; ritardo propagato alle fermate
-successive all'ultimo aggiornamento, come da specifica GTFS-RT).
+Passaggi previsti in tempo reale: previsioni di 5T (Muoversi a Torino) per la palina; se MATO
+non risponde, trip update GTFS-RT GTT (ritardo propagato alle fermate successive all'ultimo
+aggiornamento, come da specifica GTFS-RT).
 ```json
 {
   "stop_id": "350",

@@ -68,4 +68,4 @@ L'immagine (`Dockerfile`) applica le migrazioni Alembic all'avvio dell'API. Migr
 - Download falliti: si serve l'ultimo dato valido e si ritenta dopo `TT_RETRY_BACKOFF_S` (300 s).
 - Feed RT giù: ultimo payload valido fino a 1 h; `/v1/alerts` restituisce comunque gli scioperi.
 
-Dati: "Città di Torino / GTT" (CC BY 4.0); scioperi MIT — Osservatorio sui Conflitti Sindacali.
+Dati: "Città di Torino / GTT" (CC BY 4.0); arrivi "5T / Muoversi a Torino"; scioperi MIT — Osservatorio sui Conflitti Sindacali.

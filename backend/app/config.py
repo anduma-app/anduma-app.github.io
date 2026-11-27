@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     rt_trip_updates_url: str = "https://percorsieorari.gtt.to.it/das_gtfsrt/trip_update.aspx"
     rt_alerts_url: str = "https://percorsieorari.gtt.to.it/das_gtfsrt/alerts.aspx"
 
+    # --- Muoversi a Torino (5T): previsioni di arrivo, fonte principale degli arrivi ---
+    # GraphQL di OpenTripPlanner usato da muoversiatorino.it (non documentato).
+    mato_graphql_url: str = "https://mapi.5t.torino.it/routing/v1/routers/mat/index/graphql"
+
     # --- Scioperi (MIT, Osservatorio sui Conflitti Sindacali) ---
     # Feed RSS degli scioperi in programma. Il CSV su dati.mit.gov.it è fermo al 2020.
     strikes_rss_url: str = "https://scioperi.mit.gov.it/mit2/public/scioperi/rss"
@@ -41,6 +45,7 @@ class Settings(BaseSettings):
     # --- TTL cache (secondi) ---
     ttl_vehicle_positions: int = 12
     ttl_trip_updates: int = 12
+    ttl_mato_arrivals: int = 15  # per palina
     ttl_alerts: int = 60
     ttl_strikes: int = 3600
     ttl_gtfs_static: int = 24 * 3600

@@ -19,7 +19,7 @@ from app.alerts import (
     strike_key,
 )
 from app.db import Base, Device, NotifiedEvent, Subscription
-from app.realtime import parse_feed
+from app.realtime import arrivals_for_stop, parse_feed
 from app.scioperi import filter_for_torino, parse_strikes_rss
 
 # Stesso istante delle fixture: gli arrivi cadono a +120s / +240s.
@@ -46,6 +46,11 @@ def _device_with_sub(session_factory, **sub_kwargs) -> tuple[int, int]:
 
 
 # ------------------------------------------------------------------- imminent
+def _gtt(feed, gtfs):
+    """Arrivi dal feed GTT di fixture (la fonte MATO ha i suoi test in test_mato)."""
+    return lambda stop_id, line, now: arrivals_for_stop(feed, gtfs, stop_id, line=line, now=now)
+
+
 def test_imminent_enqueues_once(session_factory, gtfs, trip_updates_bytes):
     _device_with_sub(session_factory, kind="imminent", stop_id="350", line="10", threshold_min=5)
     feed = parse_feed(trip_updates_bytes)
@@ -53,7 +58,7 @@ def test_imminent_enqueues_once(session_factory, gtfs, trip_updates_bytes):
 
     with session_factory() as s:
         # Linea 10 alla 350: arrivo a 4 min ≤ soglia 5 → 1 accodato.
-        n = evaluate_imminent(s, feed, gtfs, dispatcher, now=FUTURE_TS)
+        n = evaluate_imminent(s, _gtt(feed, gtfs), dispatcher, now=FUTURE_TS)
     assert n == 1
     assert len(dispatcher.pending) == 1
     msg = dispatcher.pending[0]
@@ -61,7 +66,7 @@ def test_imminent_enqueues_once(session_factory, gtfs, trip_updates_bytes):
 
     # Secondo giro con lo stesso feed → idempotente: niente nuovi accodamenti.
     with session_factory() as s:
-        n2 = evaluate_imminent(s, feed, gtfs, dispatcher, now=FUTURE_TS)
+        n2 = evaluate_imminent(s, _gtt(feed, gtfs), dispatcher, now=FUTURE_TS)
     assert n2 == 0
     assert len(dispatcher.pending) == 1
 
@@ -77,7 +82,7 @@ def test_imminent_respects_threshold(session_factory, gtfs, trip_updates_bytes):
     feed = parse_feed(trip_updates_bytes)
     dispatcher = InProcessDispatcher()
     with session_factory() as s:
-        assert evaluate_imminent(s, feed, gtfs, dispatcher, now=FUTURE_TS) == 0
+        assert evaluate_imminent(s, _gtt(feed, gtfs), dispatcher, now=FUTURE_TS) == 0
     assert dispatcher.pending == []
 
 
@@ -87,14 +92,14 @@ def test_imminent_all_lines_when_no_line_filter(session_factory, gtfs, trip_upda
     feed = parse_feed(trip_updates_bytes)
     dispatcher = InProcessDispatcher()
     with session_factory() as s:
-        assert evaluate_imminent(s, feed, gtfs, dispatcher, now=FUTURE_TS) == 2
+        assert evaluate_imminent(s, _gtt(feed, gtfs), dispatcher, now=FUTURE_TS) == 2
 
 
 def test_imminent_no_subscriptions(session_factory, gtfs, trip_updates_bytes):
     feed = parse_feed(trip_updates_bytes)
     dispatcher = InProcessDispatcher()
     with session_factory() as s:
-        assert evaluate_imminent(s, feed, gtfs, dispatcher, now=FUTURE_TS) == 0
+        assert evaluate_imminent(s, _gtt(feed, gtfs), dispatcher, now=FUTURE_TS) == 0
 
 
 # --------------------------------------------------------------------- strike
@@ -205,7 +210,7 @@ def test_expired_dedup_rows_are_purged(session_factory, gtfs, trip_updates_bytes
     _device_with_sub(session_factory, kind="imminent", stop_id="350", line="10", threshold_min=5)
     feed = parse_feed(trip_updates_bytes)
     with session_factory() as s:
-        assert evaluate_imminent(s, feed, gtfs, InProcessDispatcher(), now=FUTURE_TS) == 1
+        assert evaluate_imminent(s, _gtt(feed, gtfs), InProcessDispatcher(), now=FUTURE_TS) == 1
         # Ben oltre la scadenza: la riga sparisce, il trip (ormai passato) non rinotifica.
-        evaluate_imminent(s, feed, gtfs, InProcessDispatcher(), now=FUTURE_TS + 86_400)
+        evaluate_imminent(s, _gtt(feed, gtfs), InProcessDispatcher(), now=FUTURE_TS + 86_400)
         assert s.scalars(select(NotifiedEvent)).all() == []

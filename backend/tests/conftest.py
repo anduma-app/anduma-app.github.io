@@ -56,6 +56,11 @@ class FakeProvider:
     def alerts_bytes(self) -> bytes:
         return (FIX / "alerts.pb").read_bytes()
 
+    def mato_stoptimes(self, stop_code: str) -> bytes:
+        # MATO irraggiungibile: gli endpoint ripiegano sul feed GTT di fixture.
+        # I test della fonte MATO usano ``mato_stoptimes.json`` (vedi test_mato).
+        raise ConnectionError("MATO non disponibile nei test")
+
     def strikes_feed(self) -> str:
         return (FIX / "scioperi.xml").read_text(encoding="utf-8")
 

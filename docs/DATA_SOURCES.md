@@ -45,6 +45,30 @@ https://aperto.comune.torino.it/en/dataset/feed-gtfs-real-time-trasporti-gtt
   (fino a 1 h) e `/v1/alerts` restituisce comunque gli scioperi (`service_alerts_available=false`).
 - Tutti i campi sono opzionali per spec: controllare sempre `HasField(...)` prima di leggere.
 
+## Arrivi in fermata: Muoversi a Torino (5T)
+
+Fonte principale degli arrivi (`/v1/stops/{id}/arrivals` e alert `imminent`); il feed GTT
+trip update resta come ripiego se MATO non risponde o non conosce la fermata.
+
+- Endpoint: GraphQL di OpenTripPlanner usato da muoversiatorino.it,
+  https://mapi.5t.torino.it/routing/v1/routers/mat/index/graphql (POST JSON, non documentato).
+- Query: `stop(id: "gtt:<palina>") { stoptimesWithoutPatterns { realtime realtimeState
+  realtimeArrival serviceDay trip { gtfsId tripHeadsign route { shortName } } } }`.
+  L'id è la **palina** (`stop_code`), non lo `stop_id` GTFS. Arrivo = `serviceDay + realtimeArrival`.
+  `gtfsId` = `gtt:` + `trip_id` GTT. Si tengono solo `realtime: true` non `CANCELED`.
+- Perché: 5T calcola le previsioni con un proprio sistema dalle posizioni dei mezzi. Misura del
+  27/11/2026 (10 min, 14 fermate, passaggi reali dallo stream MQTT di 5T): a 5–10 min errore
+  mediano 1 min contro 3,5 min del feed GTT, che oltre le prime fermate propaga l'ultimo ritardo.
+- Licenza: pubblicato da 5T (società in house del Comune) senza licenza esplicita → dati aperti
+  per l'art. 52 c. 2 del CAD, che le linee guida AgID equiparano a **CC BY 4.0**: credito
+  "5T / Muoversi a Torino".
+- Cache: 15 s per palina (`ttl_mato_arrivals`), nessun ripiego su risposte vecchie.
+- **Trappola**: la metro M1 non ha passaggi in tempo reale (solo da orario): arrivi vuoti.
+- **Trappola**: interfaccia non documentata, può cambiare senza preavviso; il ripiego GTT copre i guasti.
+- Altre sorgenti 5T non usate: posizioni MQTT `wss://mapi.5t.torino.it/scre` (topic
+  `/<linea>/<mezzo>`, array `[lat, lon, direzione, velocità, corsa, verso, prossima_fermata, pieno]`,
+  ~6 s) e mezzi in sharing dal secondo OTP `https://plan.muoversiatorino.it/otp/routers/mato/`.
+
 ## Scioperi (MIT)
 
 - Osservatorio sui Conflitti Sindacali del MIT — fonte ufficiale, preavviso ≥ 10 giorni per legge.
@@ -68,6 +92,7 @@ https://aperto.comune.torino.it/en/dataset/feed-gtfs-real-time-trasporti-gtt
 ## Riepilogo licenze / crediti
 
 - Feed GTT (statico + RT): **CC BY 4.0** → credito "Città di Torino / GTT".
+- Arrivi in tempo reale: **5T / Muoversi a Torino** (art. 52 CAD, CC BY 4.0).
 - Scioperi: dati **MIT — Osservatorio sui Conflitti Sindacali**.
 - Mappa: tile **OpenStreetMap** → credito "© OpenStreetMap contributors".
 Inserire tutti i crediti in una schermata "Informazioni / Fonti dati" dell'app.

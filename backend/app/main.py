@@ -22,7 +22,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
 
-from . import realtime, scioperi
+from . import mato, realtime, scioperi
 from .cache import RedisCache
 from .config import get_settings
 from .db import db_healthcheck
@@ -152,8 +152,7 @@ def stop_arrivals(
     stop = gtfs.stop(stop_id)
     if stop is None and gtfs.stops:
         raise HTTPException(status_code=404, detail="Fermata non trovata")
-    feed = realtime.parse_feed(provider.trip_updates_bytes())
-    arrivals = realtime.arrivals_for_stop(feed, gtfs, stop_id, line=line)
+    arrivals = mato.stop_arrivals(provider, stop_id, line=line)
     return ArrivalsResponse(
         stop_id=stop_id,
         name=stop.name if stop else None,
