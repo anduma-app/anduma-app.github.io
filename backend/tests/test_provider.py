@@ -62,8 +62,29 @@ def test_strikes_failure_backs_off_and_keeps_last(day):
     p = LiveProvider(
         Settings(ttl_strikes=0), gtfs_downloader=Downloader(ZIP), strikes_downloader=dl
     )
+    p.strikes_feed()  # primo download, in background
+    p._strikes_thread.join(5)
     assert p.strikes_feed() == "<rss/>"
+    p._strikes_thread.join(5)
     dl.result = OSError("rete giù")
     assert p.strikes_feed() == "<rss/>"
+    p._strikes_thread.join(5)
+    assert p.strikes_feed() == "<rss/>"  # entro il backoff: nessun nuovo tentativo
+    assert dl.calls == 3
+
+
+def test_strikes_never_block_the_caller(day):
+    import threading
+
+    release = threading.Event()
+
+    def slow(_settings):
+        release.wait(5)  # sito MIT che non risponde
+        return "<rss/>"
+
+    p = LiveProvider(Settings(), gtfs_downloader=Downloader(ZIP), strikes_downloader=slow)
+    assert p.strikes_feed() == ""  # risponde subito con lo snapshot (vuoto)
+    assert p.strikes_feed() == ""  # download già in corso: nessun secondo thread
+    release.set()
+    p._strikes_thread.join(5)
     assert p.strikes_feed() == "<rss/>"
-    assert dl.calls == 2

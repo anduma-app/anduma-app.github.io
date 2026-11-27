@@ -65,6 +65,7 @@ class LiveProvider:
         self._strikes_lock = threading.Lock()
         self._strikes: str = ""
         self._strikes_next_download: float = 0.0
+        self._strikes_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------------ GTFS
     def gtfs(self) -> GtfsStatic:
@@ -125,22 +126,32 @@ class LiveProvider:
 
     # -------------------------------------------------------------- scioperi
     def strikes_feed(self) -> str:
-        if time.time() < self._strikes_next_download:
-            return self._strikes
-        if not self._strikes_lock.acquire(blocking=False):
-            return self._strikes  # aggiornamento già in corso: servi l'ultimo
+        """Ultimo registro scioperi; se è da aggiornare lo scarica in background.
+
+        Il sito MIT può non rispondere affatto (timeout): nessuna richiesta deve
+        aspettarlo, quindi si serve sempre lo snapshot corrente.
+        """
+        if time.time() >= self._strikes_next_download and self._strikes_lock.acquire(
+            blocking=False
+        ):
+            self._strikes_thread = threading.Thread(
+                target=self._refresh_strikes, name="strikes", daemon=True
+            )
+            self._strikes_thread.start()
+        return self._strikes
+
+    def _refresh_strikes(self) -> None:
+        """Scarica il registro (con ``_strikes_lock`` già acquisito, che rilascia)."""
         try:
             now = time.time()
-            if now >= self._strikes_next_download:
-                try:
-                    self._strikes = self._download_strikes(self._settings)
-                    self._strikes_next_download = now + self._settings.ttl_strikes
-                except Exception:
-                    self._strikes_next_download = now + self._settings.retry_backoff_s
-                    log.exception("Download registro scioperi fallito: uso l'ultimo snapshot")
+            try:
+                self._strikes = self._download_strikes(self._settings)
+                self._strikes_next_download = now + self._settings.ttl_strikes
+            except Exception:
+                self._strikes_next_download = now + self._settings.retry_backoff_s
+                log.exception("Download registro scioperi fallito: uso l'ultimo snapshot")
         finally:
             self._strikes_lock.release()
-        return self._strikes
 
     @property
     def cache(self) -> Cache:

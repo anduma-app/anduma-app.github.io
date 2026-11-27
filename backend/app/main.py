@@ -57,6 +57,7 @@ async def lifespan(app: FastAPI):
     # Pre-carica il GTFS statico (tollerante a rete assente).
     with suppress(Exception):
         await run_in_threadpool(provider.gtfs)
+    provider.strikes_feed()  # avvia il primo download degli scioperi (in background)
     # Scheduler nel processo API: solo per sviluppo (in produzione: app.worker).
     if settings.scheduler_enabled:
         scheduler = create_scheduler(provider, settings)
